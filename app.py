@@ -452,18 +452,15 @@ def download():
         flash('URL inválida. Insira um link válido do YouTube.')
         return redirect(url_for('index'))
 
-    # ─── VERCEL MODE: Redirect to Invidious instead ───
+    # ─── VERCEL MODE: Show download alternatives ───
     if IS_VERCEL:
         video_id = extract_video_id(url)
-        if video_id:
-            # Redirect to Invidious for direct download
-            invidious_url = f'https://inv.nadeko.net/watch?v={video_id}'
-            logger.info(f'VERCEL MODE: Redirecionando para Invidious: {invidious_url}')
-            flash('YouTube bloqueia downloads de servidores. Abrindo Invidious (proxy seguro)...')
-            return redirect(invidious_url)
-        else:
-            flash('Erro ao processar URL.')
-            return redirect(url_for('index'))
+        logger.info(f'VERCEL MODE: Mostrando alternativas de download para {video_id}')
+        return render_template('download_alternatives.html', 
+                               url=url, 
+                               video_id=video_id,
+                               format=fmt,
+                               quality=quality)
 
     tmpdir = tempfile.mkdtemp(dir=DOWN_DIR, prefix='ydl_')
 
