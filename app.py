@@ -166,18 +166,25 @@ def format_duration(seconds):
 
 
 def get_ydl_common_opts():
-    """Opções comuns para yt-dlp com headers para contornar verificação de bot"""
+    """Opções comuns para yt-dlp com máximo esforço contra bot detection"""
     return {
         'quiet': False,
         'no_warnings': False,
         'noplaylist': True,
+        'no_check_certificates': True,
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'DNT': '1',
+            'Referer': 'https://www.youtube.com/',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
         },
-        'socket_timeout': 60,
-        'retries': 5,
-        'fragment_retries': 5,
+        'socket_timeout': 120,
+        'retries': 10,
+        'fragment_retries': 10,
         'skip_unavailable_fragments': True,
         'extractor_args': {
             'youtube': {
@@ -186,6 +193,7 @@ def get_ydl_common_opts():
             }
         },
         'youtube_include_dash_manifest': False,
+        'youtube_ignore_age_gate': True,
     }
 
 
@@ -218,11 +226,13 @@ def preview_video_info():
     opts = get_ydl_common_opts()
     opts['skip_download'] = True
 
-    # Tentar múltiplas vezes com delay
-    for attempt in range(3):
+    # Tentar múltiplas vezes com delay maior
+    for attempt in range(5):
         try:
+            logger.info(f'Preview attempt {attempt + 1}/5 para {url[:50]}')
             with YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=False)
+            logger.info(f'Preview sucesso para {url[:50]}')
             return jsonify({
                 'title': info.get('title') or 'Sem título',
                 'thumbnail': info.get('thumbnail') or '',
@@ -231,15 +241,21 @@ def preview_video_info():
                 'uploader': info.get('uploader') or 'Canal desconhecido',
             })
         except DownloadError as e:
-            if attempt < 2:
-                time.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
+            logger.warning(f'DownloadError attempt {attempt + 1}: {str(e)[:100]}')
+            if attempt < 4:
+                wait_time = 3 * (attempt + 1)  # 3s, 6s, 9s, 12s, 15s
+                logger.info(f'Aguardando {wait_time}s antes de retry...')
+                time.sleep(wait_time)
                 continue
-            return jsonify({'error': 'Não foi possível carregar os dados do vídeo'}), 422
+            return jsonify({'error': 'YouTube bloqueou a requisição. Tente novamente em alguns minutos.'}), 429
         except Exception as e:
-            if attempt < 2:
-                time.sleep(2 ** attempt)
+            logger.warning(f'Exception attempt {attempt + 1}: {str(e)[:100]}')
+            if attempt < 4:
+                wait_time = 3 * (attempt + 1)
+                logger.info(f'Aguardando {wait_time}s antes de retry...')
+                time.sleep(wait_time)
                 continue
-            logger.error(f'Erro ao carregar preview: {str(e)[:150]}')
+            logger.error(f'Preview falhou após 5 tentativas: {str(e)[:150]}')
             return jsonify({'error': 'Erro ao carregar vídeo. Tente novamente.'}), 422
 
 
@@ -350,36 +366,41 @@ def download():
         
         with YoutubeDL(ydl_opts) as ydl:
             info = None
-            last_error = None
             
-            # Tentar extrair info com retry
-            for attempt in range(3):
+            # Tentar extrair info com retry (até 5 vezes)
+            for attempt in range(5):
                 try:
+                    logger.info(f'Download attempt {attempt + 1}/5 para {url[:50]}')
                     info = ydl.extract_info(url, download=False)
+                    logger.info(f'Info extraída com sucesso na tentativa {attempt + 1}')
                     break
                 except DownloadError as e:
-                    last_error = e
+                    logger.warning(f'DownloadError attempt {attempt + 1}: {str(e)[:100]}')
                     err_msg = str(e).lower()
                     if 'private' in err_msg or 'not available' in err_msg:
                         raise ValueError('Vídeo é privado, restrito ou foi removido.')
                     elif 'age' in err_msg:
                         raise ValueError('Vídeo requer verificação de idade.')
-                    elif attempt < 2:
-                        time.sleep(2 ** attempt)  # Exponential backoff
+                    elif attempt < 4:
+                        wait_time = 3 * (attempt + 1)
+                        logger.info(f'Aguardando {wait_time}s antes de retry...')
+                        time.sleep(wait_time)
                         continue
                     else:
-                        raise ValueError(f'Erro ao obter informações: {str(e)[:100]}')
+                        raise ValueError(f'Erro ao obter informações (bloqueado pelo YouTube): {str(e)[:100]}')
                 except Exception as e:
-                    last_error = e
-                    if attempt < 2:
-                        time.sleep(2 ** attempt)
+                    logger.warning(f'Exception attempt {attempt + 1}: {str(e)[:100]}')
+                    if attempt < 4:
+                        wait_time = 3 * (attempt + 1)
+                        logger.info(f'Aguardando {wait_time}s antes de retry...')
+                        time.sleep(wait_time)
                         continue
                     else:
-                        logger.exception(f'Falha ao extrair info de {url}')
-                        raise ValueError('Erro ao extrair informações do vídeo')
+                        logger.exception(f'Falha ao extrair info após 5 tentativas')
+                        raise ValueError('Erro ao extrair informações do vídeo após múltiplas tentativas')
             
             if info is None:
-                raise ValueError('Não foi possível obter informações do vídeo após várias tentativas')
+                raise ValueError('Não foi possível obter informações do vídeo')
 
             size = 0
             try:
