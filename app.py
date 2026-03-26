@@ -51,27 +51,35 @@ MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE_MB', 1200)) * 1024 * 1024
 ALLOWED_FORMATS = {'mp4', 'mp3'}
 ALLOWED_QUALITIES = {'best', '1080p', '720p', '480p', '360p'}
 DOWNLOAD_STATS = deque(maxlen=50)
-STATS_FILE = os.path.join(os.path.dirname(__file__), 'stats.json')
+STATS_FILE = os.path.join('/tmp', 'stats.json')
 DOWNLOAD_ACTIVE = {}  # Track active downloads for cancellation
 DOWNLOAD_PROGRESS = {} # Track real-time progress
 
-DOWN_DIR = os.path.join(tempfile.gettempdir(), 'yt_downloads')
+DOWN_DIR = os.path.join('/tmp', 'yt_downloads')
 os.makedirs(DOWN_DIR, exist_ok=True)
 
-FFMPEG_EXE = os.getenv('FFMPEG_PATH') or imageio_ffmpeg.get_ffmpeg_exe()
+try:
+    FFMPEG_EXE = os.getenv('FFMPEG_PATH') or imageio_ffmpeg.get_ffmpeg_exe()
+except Exception:
+    FFMPEG_EXE = 'ffmpeg'  # fallback para ffmpeg no PATH
 
 # ─── Logging ───
-log_file = os.path.join(os.path.dirname(__file__), 'download.log')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-handler = logging.FileHandler(log_file, encoding='utf-8')
 formatter = logging.Formatter(
     '[%(asctime)s] %(levelname)s - %(funcName)s:%(lineno)d - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.addHandler(logging.StreamHandler())
+try:
+    log_file = os.path.join('/tmp', 'download.log')
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+except Exception:
+    pass
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 # Load stats from JSON on startup
 def load_stats():
@@ -121,7 +129,9 @@ def cleanup_old_tempdirs():
             logger.error(f'Erro na limpeza: {e}')
         time.sleep(3600)
 
-threading.Thread(target=cleanup_old_tempdirs, daemon=True).start()
+# Apenas inicia thread de limpeza fora de ambiente serverless
+if os.getenv('VERCEL') is None:
+    threading.Thread(target=cleanup_old_tempdirs, daemon=True).start()
 
 
 # ─── Helpers ───
