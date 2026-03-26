@@ -195,6 +195,51 @@ sudo apt-get install ffmpeg
 - Pode exigir verificação de idade
 - Tente outra URL
 
+## IMPORTANTE: Limitação de Servidor
+
+### YouTube bloqueia downloads de servidores
+
+YouTube detecta e bloqueia automaticamente requisições de IPs datacenter (como Vercel, Heroku, etc.) com desafios "Faça login para confirmar que você não é um robô".
+
+**Solução implementada:**
+- ✅ **Previews funcionam** no Vercel (usando cache + Invidious)
+- ⏩ **Downloads redirecionam** para Invidious (proxy seguro do YouTube)
+- ✅ **Funciona 100% localmente** sem nenhuma limitação
+
+### Modo Vercel (Online)
+
+O app detecta se está rodando no Vercel e:
+1. **Previews** - Carrega imagens/info via Invidious
+2. **Downloads** - Redireciona para https://inv.nadeko.net (proxy seguro)
+
+Você pode usar o app remotamente, mas os downloads abrem em Invidious (que permite download direto).
+
+### Para usar sem limitações (Recomendado)
+
+Execute localmente em sua máquina:
+
+```bash
+git clone https://github.com/victorhuggomed2006-ux/YoutubeDownloader
+cd YoutubeDownloader
+python -m venv venv
+venv\Scripts\activate  # Windows
+pip install -r requirements.txt
+python app.py
+```
+
+Depois acesse: **http://localhost:5000**
+
+Downloads funcionam normalmente, sem redirecionamentos.
+
+### Por que YouTube bloqueia?
+
+YouTube implementa proteção anti-bot que:
+1. Detecta requisições de IPs datacenter
+2. Solicita verificação humana
+3. Bloqueia automaticamente tools de download
+
+Isso é uma limitação do YouTube, não do nosso app. Mesmo soluções profissionais (como yt-dlp, youtube-dl) têm este problema em servidores.
+
 ## Planos futuros
 
 - Suporte a playlists

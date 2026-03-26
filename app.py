@@ -64,6 +64,10 @@ try:
 except Exception:
     FFMPEG_EXE = 'ffmpeg'  # fallback para ffmpeg no PATH
 
+# Vercel detection and cache
+IS_VERCEL = os.getenv('VERCEL') == '1'
+PREVIEW_CACHE = {}  # Cache de previews para reutilizar no Vercel
+
 # ─── Logging ───
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -254,6 +258,65 @@ def get_video_info_invidious(video_id):
     return None
 
 
+def get_piped_streams(video_id):
+    """Obtém streams do Piped (alternativa ao Invidious para downloads)"""
+    servers = [
+        'https://piped.kavin.rocks',
+        'https://piped-backend.kavin.rocks',
+        'https://pipedapi.tokhmi.xyz',
+    ]
+    
+    logger.info(f'Piped: Tentando obter streams para video_id={video_id}')
+    
+    for server in servers:
+        try:
+            url = f'{server}/api/v1/streams/{video_id}'
+            logger.info(f'Piped: Fazendo request para {server}')
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f'Piped: Recebido stream data de {server}')
+                
+                streams = data.get('videoStreams', [])
+                audio_streams = data.get('audioStreams', [])
+                
+                # Procura melhor qualidade disponível
+                best_video = sorted(
+                    [s for s in streams if s.get('quality') and 'mp4' in s.get('mimeType', '')],
+                    key=lambda x: int(s.get('quality', '0p').replace('p', '')) or 0,
+                    reverse=True
+                )[:1]
+                
+                best_audio = sorted(
+                    audio_streams,
+                    key=lambda x: x.get('bitrate', 0),
+                    reverse=True
+                )[:1]
+                
+                if best_video and best_audio:
+                    logger.info(f'Piped: Encontrou video {best_video[0].get("quality")} e audio {best_audio[0].get("bitrate")} bps')
+                    return {
+                        'title': data.get('title', 'Sem título'),
+                        'thumbnail': data.get('thumbnailUrl', ''),
+                        'duration': data.get('duration', 0),
+                        'uploader': data.get('uploader', 'Desconhecido'),
+                        'video_url': best_video[0].get('url', ''),
+                        'audio_url': best_audio[0].get('url', ''),
+                    }
+                else:
+                    logger.warning(f'Piped: Streams insuficientes em {server}')
+            else:
+                logger.warning(f'Piped: {server} retornou status {response.status_code}')
+                
+        except Exception as e:
+            logger.warning(f'Piped: Erro ao conectar em {server}: {str(e)[:80]}')
+            continue
+    
+    logger.error(f'Piped: Todos os servidores falharam para video_id={video_id}')
+    return None
+
+
 # ─── Routes ───
 @app.route('/', methods=['GET'])
 def index():
@@ -286,32 +349,40 @@ def preview_video_info():
     video_id = extract_video_id(url)
     logger.info(f'Video ID extraído: {video_id}')
     
+    # Check cache first
+    if video_id in PREVIEW_CACHE:
+        logger.info(f'Retornando preview em cache para {video_id}')
+        return jsonify(PREVIEW_CACHE[video_id])
+    
     opts = get_ydl_common_opts()
     opts['skip_download'] = True
 
-    # Tentar yt-dlp primeiro
-    for attempt in range(2):
+    # ─── Strategy 1: yt-dlp (2 attempts, short timeout on Vercel) ───
+    max_ydl_attempts = 1 if IS_VERCEL else 2
+    for attempt in range(max_ydl_attempts):
         try:
-            logger.info(f'Preview yt-dlp attempt {attempt + 1}/2 para {url[:50]}')
+            logger.info(f'Preview yt-dlp attempt {attempt + 1}/{max_ydl_attempts}')
             with YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=False)
             logger.info(f'Preview yt-dlp sucesso')
-            return jsonify({
+            result = {
                 'title': info.get('title') or 'Sem título',
                 'thumbnail': info.get('thumbnail') or '',
                 'duration': info.get('duration') or 0,
                 'duration_label': format_duration(info.get('duration')),
                 'uploader': info.get('uploader') or 'Canal desconhecido',
-            })
+            }
+            PREVIEW_CACHE[video_id] = result  # Cache para reutilizar
+            return jsonify(result)
         except Exception as e:
             err_msg = str(e)[:150]
             logger.warning(f'yt-dlp falhou attempt {attempt + 1}: {err_msg}')
-            if attempt < 1:
-                time.sleep(2)
+            if attempt < max_ydl_attempts - 1:
+                time.sleep(1)
                 continue
     
-    # Fallback: Tentar Invidious (proxy do YouTube)
-    logger.info(f'Yt-dlp falhou. Passando para Invidious. Video ID: {video_id}')
+    # ─── Strategy 2: Invidious (primary on Vercel) ───
+    logger.info(f'Yt-dlp falhou. Tentando Invidious. Video ID: {video_id}')
     
     if video_id:
         logger.info(f'Iniciando Invidious para video_id={video_id}')
@@ -320,13 +391,8 @@ def preview_video_info():
             logger.info(f'Invidious retornou: {invidious_info is not None}')
             if invidious_info:
                 logger.info('Invidious sucesso! Retornando dados.')
-                return jsonify({
-                    'title': invidious_info.get('title', 'Sem título'),
-                    'thumbnail': invidious_info.get('thumbnail', ''),
-                    'duration': invidious_info.get('duration', 0),
-                    'duration_label': format_duration(invidious_info.get('duration')),
-                    'uploader': invidious_info.get('uploader', 'Canal desconhecido'),
-                })
+                PREVIEW_CACHE[video_id] = invidious_info  # Cache
+                return jsonify(invidious_info)
             else:
                 logger.warning('Invidious retornou None/vazio')
         except Exception as inv_error:
@@ -335,7 +401,7 @@ def preview_video_info():
         logger.error(f'Não foi possível extrair video_id da URL: {url}')
     
     logger.error('Todos os métodos falharam - returnando 429')
-    return jsonify({'error': 'YouTube e proxies estão bloqueando. Tente mais tarde ou use outro vídeo.'}), 429
+    return jsonify({'error': 'YouTube bloqueado. Tente novamente em alguns minutos.'}), 429
 
 
 @app.route('/stats', methods=['GET'])
@@ -385,6 +451,19 @@ def download():
     if not validate_youtube_url(url):
         flash('URL inválida. Insira um link válido do YouTube.')
         return redirect(url_for('index'))
+
+    # ─── VERCEL MODE: Redirect to Invidious instead ───
+    if IS_VERCEL:
+        video_id = extract_video_id(url)
+        if video_id:
+            # Redirect to Invidious for direct download
+            invidious_url = f'https://inv.nadeko.net/watch?v={video_id}'
+            logger.info(f'VERCEL MODE: Redirecionando para Invidious: {invidious_url}')
+            flash('YouTube bloqueia downloads de servidores. Abrindo Invidious (proxy seguro)...')
+            return redirect(invidious_url)
+        else:
+            flash('Erro ao processar URL.')
+            return redirect(url_for('index'))
 
     tmpdir = tempfile.mkdtemp(dir=DOWN_DIR, prefix='ydl_')
 
@@ -446,15 +525,15 @@ def download():
         with YoutubeDL(ydl_opts) as ydl:
             info = None
             
-            # Tentar extrair info com retry (até 5 vezes)
+            # Tentar extrair info com retry (até 5 vezes) com yt-dlp
             for attempt in range(5):
                 try:
-                    logger.info(f'Download attempt {attempt + 1}/5 para {url[:50]}')
+                    logger.info(f'Download yt-dlp attempt {attempt + 1}/5 para {url[:50]}')
                     info = ydl.extract_info(url, download=False)
-                    logger.info(f'Info extraída com sucesso na tentativa {attempt + 1}')
+                    logger.info(f'Info yt-dlp extraída com sucesso na tentativa {attempt + 1}')
                     break
                 except DownloadError as e:
-                    logger.warning(f'DownloadError attempt {attempt + 1}: {str(e)[:100]}')
+                    logger.warning(f'yt-dlp DownloadError attempt {attempt + 1}: {str(e)[:100]}')
                     err_msg = str(e).lower()
                     if 'private' in err_msg or 'not available' in err_msg:
                         raise ValueError('Vídeo é privado, restrito ou foi removido.')
@@ -462,25 +541,37 @@ def download():
                         raise ValueError('Vídeo requer verificação de idade.')
                     elif attempt < 4:
                         wait_time = 3 * (attempt + 1)
-                        logger.info(f'Aguardando {wait_time}s antes de retry...')
+                        logger.info(f'Aguardando {wait_time}s antes de retry yt-dlp...')
                         time.sleep(wait_time)
                         continue
-                    else:
-                        raise ValueError(f'Erro ao obter informações (bloqueado pelo YouTube): {str(e)[:100]}')
                 except Exception as e:
-                    logger.warning(f'Exception attempt {attempt + 1}: {str(e)[:100]}')
+                    logger.warning(f'yt-dlp Exception attempt {attempt + 1}: {str(e)[:100]}')
                     if attempt < 4:
                         wait_time = 3 * (attempt + 1)
-                        logger.info(f'Aguardando {wait_time}s antes de retry...')
+                        logger.info(f'Aguardando {wait_time}s antes de retry yt-dlp...')
                         time.sleep(wait_time)
                         continue
-                    else:
-                        logger.exception(f'Falha ao extrair info após 5 tentativas')
-                        raise ValueError('Erro ao extrair informações do vídeo após múltiplas tentativas')
             
             if info is None:
-                raise ValueError('Não foi possível obter informações do vídeo')
-
+                # yt-dlp falhou. Tenta Invidious como fallback
+                logger.info(f'yt-dlp falhou após 5 tentativas. Tentando Invidious...')
+                video_id = extract_video_id(url)
+                if video_id:
+                    invidious_info = get_video_info_invidious(video_id)
+                    if invidious_info:
+                        logger.info(f'Invidious retornou metadata para {video_id}. Mas Invidious não suporta downloads diretos.')
+                        raise ValueError(
+                            'YouTube está bloqueando downloads via servidor. '
+                            'Para usar este app, execute-o localmente: git clone && python app.py'
+                        )
+                    else:
+                        logger.error(f'Invidious também falhou para video_id={video_id}')
+                        raise ValueError(
+                            'YouTube bloqueado. Execute localmente: git clone https://github.com/victorhuggomed2006-ux/YoutubeDownloader && python app.py'
+                        )
+                else:
+                    raise ValueError('Erro ao extrair informações do vídeo (bloqueado pelo YouTube)')
+            
             size = 0
             try:
                 size = info.get('filesize') or info.get('filesize_approx') or 0
@@ -490,7 +581,7 @@ def download():
             if size and size > MAX_FILE_SIZE:
                 raise ValueError(f"Arquivo muito grande ({size//(1024*1024)}MB). Máximo: {MAX_FILE_SIZE//(1024*1024)}MB")
 
-            logger.info(f'Iniciando download: {fmt} {quality} - {size//1024}KB')
+            logger.info(f'Iniciando download: {fmt} {quality} - {size//1024}KB' if size else f'Iniciando download: {fmt} {quality}')
             ensure_not_cancelled()
             ydl.download([url])
 
