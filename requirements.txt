@@ -7,3 +7,4 @@ imageio-ffmpeg>=0.5.1
 gunicorn>=21.0
 Werkzeug>=2.3.0
 Flask-Compress>=1.13
+requests>=2.31.0

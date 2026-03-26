@@ -13,7 +13,8 @@ import logging
 import re
 import time
 from datetime import datetime, timezone
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
+import requests
 from yt_dlp import YoutubeDL, DownloadError
 from collections import deque
 import imageio_ffmpeg
@@ -197,6 +198,49 @@ def get_ydl_common_opts():
     }
 
 
+def extract_video_id(url):
+    """Extrai video ID do URL do YouTube"""
+    parsed = parse_qs(urlparse(url).query)
+    if 'v' in parsed:
+        return parsed['v'][0]
+    # Trata youtu.be
+    if 'youtu.be' in url:
+        return url.split('/')[-1].split('?')[0]
+    return None
+
+
+def get_video_info_invidious(video_id):
+    """Tenta obter info via API do Invidious (fallback do YouTube)"""
+    try:
+        # Tenta múltiplos servidores Invidious
+        servers = [
+            'https://inv.nadeko.net',
+            'https://invidious.io',
+            'https://iv.ggtyler.dev',
+        ]
+        
+        for server in servers:
+            try:
+                url = f'{server}/api/v1/videos/{video_id}'
+                response = requests.get(url, timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        'title': data.get('title', 'Sem título'),
+                        'thumbnail': data.get('posterUrl', '').replace('/ggpht/', 'https://yt4.ggpht.com/'),
+                        'duration': data.get('lengthSeconds', 0),
+                        'uploader': data.get('author', 'Canal desconhecido'),
+                    }
+            except Exception as e:
+                logger.warning(f'Invidious server {server} falhou: {str(e)[:50]}')
+                continue
+        
+        return None
+    except Exception as e:
+        logger.error(f'Erro no Invidious: {str(e)[:100]}')
+        return None
+
+
 # ─── Routes ───
 @app.route('/', methods=['GET'])
 def index():
@@ -223,16 +267,18 @@ def preview_video_info():
     if not url or not validate_youtube_url(url):
         return jsonify({'error': 'URL inválida'}), 400
 
+    video_id = extract_video_id(url)
+    
     opts = get_ydl_common_opts()
     opts['skip_download'] = True
 
-    # Tentar múltiplas vezes com delay maior
-    for attempt in range(5):
+    # Tentar yt-dlp primeiro
+    for attempt in range(2):
         try:
-            logger.info(f'Preview attempt {attempt + 1}/5 para {url[:50]}')
+            logger.info(f'Preview yt-dlp attempt {attempt + 1}/2 para {url[:50]}')
             with YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=False)
-            logger.info(f'Preview sucesso para {url[:50]}')
+            logger.info(f'Preview yt-dlp sucesso')
             return jsonify({
                 'title': info.get('title') or 'Sem título',
                 'thumbnail': info.get('thumbnail') or '',
@@ -240,23 +286,28 @@ def preview_video_info():
                 'duration_label': format_duration(info.get('duration')),
                 'uploader': info.get('uploader') or 'Canal desconhecido',
             })
-        except DownloadError as e:
-            logger.warning(f'DownloadError attempt {attempt + 1}: {str(e)[:100]}')
-            if attempt < 4:
-                wait_time = 3 * (attempt + 1)  # 3s, 6s, 9s, 12s, 15s
-                logger.info(f'Aguardando {wait_time}s antes de retry...')
-                time.sleep(wait_time)
-                continue
-            return jsonify({'error': 'YouTube bloqueou a requisição. Tente novamente em alguns minutos.'}), 429
         except Exception as e:
-            logger.warning(f'Exception attempt {attempt + 1}: {str(e)[:100]}')
-            if attempt < 4:
-                wait_time = 3 * (attempt + 1)
-                logger.info(f'Aguardando {wait_time}s antes de retry...')
-                time.sleep(wait_time)
+            logger.warning(f'yt-dlp falhou attempt {attempt + 1}: {str(e)[:80]}')
+            if attempt < 1:
+                time.sleep(2)
                 continue
-            logger.error(f'Preview falhou após 5 tentativas: {str(e)[:150]}')
-            return jsonify({'error': 'Erro ao carregar vídeo. Tente novamente.'}), 422
+    
+    # Fallback: Tentar Invidious (proxy do YouTube)
+    if video_id:
+        logger.info(f'Tentando Invidious para {video_id}')
+        invidious_info = get_video_info_invidious(video_id)
+        if invidious_info:
+            logger.info('Invidious sucesso!')
+            return jsonify({
+                'title': invidious_info.get('title', 'Sem título'),
+                'thumbnail': invidious_info.get('thumbnail', ''),
+                'duration': invidious_info.get('duration', 0),
+                'duration_label': format_duration(invidious_info.get('duration')),
+                'uploader': invidious_info.get('uploader', 'Canal desconhecido'),
+            })
+    
+    logger.error('Todos os métodos falharam')
+    return jsonify({'error': 'YouTube e proxies estão bloqueando. Tente mais tarde ou use outro vídeo.'}), 429
 
 
 @app.route('/stats', methods=['GET'])
