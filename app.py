@@ -165,6 +165,21 @@ def format_duration(seconds):
     return f'{m:02d}:{s:02d}'
 
 
+def get_ydl_common_opts():
+    """Opções comuns para yt-dlp com headers para contornar verificação de bot"""
+    return {
+        'quiet': True,
+        'no_warnings': True,
+        'noplaylist': True,
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
+        'socket_timeout': 30,
+        'retries': 3,
+    }
+
+
 # ─── Routes ───
 @app.route('/', methods=['GET'])
 def index():
@@ -191,12 +206,8 @@ def preview_video_info():
     if not url or not validate_youtube_url(url):
         return jsonify({'error': 'URL inválida'}), 400
 
-    opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'noplaylist': True,
-        'skip_download': True,
-    }
+    opts = get_ydl_common_opts()
+    opts['skip_download'] = True
 
     try:
         with YoutubeDL(opts) as ydl:
@@ -263,19 +274,17 @@ def download():
     tmpdir = tempfile.mkdtemp(dir=DOWN_DIR, prefix='ydl_')
 
     if fmt == 'mp3':
-        ydl_opts = {
+        ydl_opts = get_ydl_common_opts()
+        ydl_opts.update({
             'format': 'bestaudio/best',
             'outtmpl': os.path.join(tmpdir, '%(title)s.%(ext)s'),
-            'noplaylist': True,
-            'quiet': True,
-            'no_warnings': True,
             'ffmpeg_location': FFMPEG_EXE,
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }]
-        }
+        })
         wanted = ['.mp3']
     else:
         quality_map = {
@@ -287,15 +296,13 @@ def download():
         }
         fmt_string = quality_map.get(quality, quality_map['best'])
 
-        ydl_opts = {
+        ydl_opts = get_ydl_common_opts()
+        ydl_opts.update({
             'format': fmt_string,
             'merge_output_format': 'mp4',
             'outtmpl': os.path.join(tmpdir, '%(title)s.%(ext)s'),
-            'noplaylist': True,
-            'quiet': True,
-            'no_warnings': True,
             'ffmpeg_location': FFMPEG_EXE,
-        }
+        })
         wanted = ['.mp4']
 
     try:
