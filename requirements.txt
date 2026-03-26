@@ -1,0 +1,9 @@
+Flask>=2.0
+yt-dlp>=2023.12.1
+flask-limiter>=3.0
+flask-wtf>=1.2
+python-dotenv>=1.0
+imageio-ffmpeg>=0.5.1
+gunicorn>=21.0
+Werkzeug>=2.3.0
+Flask-Compress>=1.13

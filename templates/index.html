@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>YT Download | Split Studio</title>
+  <meta name="description" content="A melhor e mais limpa interface para baixar vídeos do YouTube na mais alta resolução.">
+  <meta name="theme-color" content="#050505">
+  <link rel="shortcut icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script>
+    (function() {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const savedTheme = localStorage.getItem('theme') || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    })();
+  </script>
+</head>
+<body>
+
+  <div class="split-layout">
+    
+    <!-- Left Hero Art -->
+    <aside class="split-visual" aria-hidden="true">
+      <div class="fluid-art">
+        <div class="fluid-blob f-1"></div>
+        <div class="fluid-blob f-2"></div>
+        <div class="fluid-blob f-3"></div>
+      </div>
+      <div class="visual-content">
+        <div class="brand-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 22a10 10 0 100-20 10 10 0 000 20z" stroke="white" stroke-width="2"/>
+            <path d="M10 8l6 4-6 4V8z" fill="white"/>
+          </svg>
+        </div>
+        <h1 class="visual-title">YT Download<br>Studio</h1>
+        <p class="visual-sub">Experimente downloads instantâneos nativos, conversão fluída de MP3 e suporte a resolução sem limites.</p>
+        <div class="visual-chips" aria-label="Diferenciais">
+          <span class="v-chip">Sem cadastro</span>
+          <span class="v-chip">Qualidade alta</span>
+          <span class="v-chip">Processamento local</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Right Form Section -->
+    <main class="split-form">
+      <div class="form-inner">
+        <h2 class="form-title">Iniciar Processamento</h2>
+        <p class="form-sub">Cole a rota do YouTube para extrair os arquivos originais.</p>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="alerts" role="status">
+            {% for msg in messages %}
+              <div class="alert">{{ msg }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% endwith %}
+
+        <form method="post" action="/download" id="downloadForm" autocomplete="off">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <form method="post" action="/download" id="downloadForm" autocomplete="off">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="download_id" id="downloadId" value="">
+
+          <!-- URL Field -->
+          <div class="group">
+            <label class="label" for="url">Endereço do Vídeo</label>
+            <div class="input-box">
+              <svg class="input-icon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              <input class="input" type="url" id="url" name="url" placeholder="Ex: https://youtube.com/watch?v=..." required>
+              <span class="url-status" id="urlStatus"></span>
+              <button type="button" class="paste-cmd" onclick="pasteClipboard()">Colar</button>
+            </div>
+            
+            <div class="vid-preview" id="videoPreview">
+              <div class="vid-thumb"><img id="previewImg" src="" alt="Thumb"></div>
+              <div class="vid-info">
+                <div class="vid-title" id="previewTitle">Procurando formato...</div>
+                <div class="vid-sub">
+                  <span id="videoDuration">Duração: --</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Format Toggle -->
+          <div class="group">
+            <label class="label">Extração Desejada</label>
+            <div class="format-toggle">
+              <label class="fmt-opt">
+                <input type="radio" name="format" value="mp4" id="fmt_mp4" checked>
+                <span class="fmt-txt">Vídeo (MP4)</span>
+              </label>
+              <label class="fmt-opt">
+                <input type="radio" name="format" value="mp3" id="fmt_mp3">
+                <span class="fmt-txt">Somente Áudio (MP3)</span>
+              </label>
+              <div class="toggle-bg"></div>
+            </div>
+          </div>
+
+          <!-- Quality Select -->
+          <div class="group q-group" id="qualityGroup">
+            <label class="label">Qualidade do Vídeo</label>
+            <div class="q-select" id="qualitySelect">
+              <button type="button" class="q-btn" aria-haspopup="listbox" aria-expanded="false">
+                <span class="q-val">Máxima Resolucão</span>
+                <svg class="q-icon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+              </button>
+              <ul class="q-list" role="listbox">
+                <li role="option" data-value="best" aria-selected="true" class="selected" title="Máxima qualidade disponível">Máxima Resolucão</li>
+                <li role="option" data-value="1080p" aria-selected="false" title="1080p • ~80-120MB por hora">FHD · 1080p Limit</li>
+                <li role="option" data-value="720p" aria-selected="false" title="720p • ~40-60MB por hora">HD · 720p Limit</li>
+                <li role="option" data-value="480p" aria-selected="false" title="480p • ~20-40MB por hora">Standart · 480p Limit</li>
+              </ul>
+              <input type="hidden" name="quality" value="best">
+            </div>
+          </div>
+
+          <!-- Submit Action -->
+          <button class="btn-massive" type="submit" id="submitBtn">
+            <span>Iniciar Transferência</span>
+            <svg class="btn-icon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+
+          <!-- Status Indicator -->
+          <div class="dl-progress" id="progressBar">
+            <div class="p-track"><div class="p-fill" id="progressFill"></div></div>
+            <div class="p-txt" id="progressText">Conectando ao servidor...</div>
+          </div>
+          
+          <!-- Cancel Button -->
+          <button class="btn-cancel" id="cancelBtn" type="button" style="display:none;" onclick="cancelDownload()">
+            <span id="cancelText">Cancelar Download</span>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+
+        </form>
+
+        <div class="bot-links">
+          <a href="/stats">Registros Recentes</a> · 2026 Studio
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // --- 1. ID Único da Sessão ---
+    const downloadIdInput = document.getElementById('downloadId');
+    const generateDownloadId = () => Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    if(downloadIdInput) downloadIdInput.value = generateDownloadId();
+
+    // --- 2. Alternância de Layout (Vídeo/Áudio) ---
+    const fmtMp4 = document.getElementById('fmt_mp4');
+    const fmtMp3 = document.getElementById('fmt_mp3');
+    const qualityGrp = document.getElementById('qualityGroup');
+    
+    function syncLayouts() {
+      if(fmtMp3.checked) qualityGrp.classList.add('hide-smooth');
+      else qualityGrp.classList.remove('hide-smooth');
+    }
+    fmtMp4.addEventListener('change', syncLayouts);
+    fmtMp3.addEventListener('change', syncLayouts);
+    syncLayouts();
+
+    // --- 3. Menu Customizado de Qualidade ---
+    (function(){
+      const selectBox = document.getElementById('qualitySelect');
+      if(!selectBox) return;
+      const btn = selectBox.querySelector('.q-btn');
+      const list = selectBox.querySelector('.q-list');
+      const valText = selectBox.querySelector('.q-val');
+      const hiddenIn = selectBox.querySelector('input[type="hidden"]');
+      const options = Array.from(list.querySelectorAll('li'));
+
+      btn.addEventListener('click', () => {
+        const isOpen = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', !isOpen);
+        if(isOpen) list.classList.remove('show');
+        else { list.classList.add('show'); options[0].focus(); }
+      });
+
+      function applySelection(li) {
+        options.forEach(o => { o.setAttribute('aria-selected', false); o.classList.remove('selected'); });
+        li.setAttribute('aria-selected', true);
+        li.classList.add('selected');
+        hiddenIn.value = li.dataset.value;
+        valText.textContent = li.textContent;
+        list.classList.remove('show');
+        btn.setAttribute('aria-expanded', false);
+        btn.focus();
+      }
+
+      options.forEach((opt, i) => {
+        opt.tabIndex = 0;
+        opt.addEventListener('click', () => applySelection(opt));
+        opt.addEventListener('keydown', e => {
+          if(['Enter', ' '].includes(e.key)) { e.preventDefault(); applySelection(opt); }
+          else if(e.key === 'ArrowDown') { e.preventDefault(); options[(i+1)%options.length].focus(); }
+          else if(e.key === 'ArrowUp') { e.preventDefault(); options[(i-1+options.length)%options.length].focus(); }
+          else if(e.key === 'Escape') { list.classList.remove('show'); btn.setAttribute('aria-expanded', false); btn.focus(); }
+        });
+      });
+
+      document.addEventListener('click', e => {
+        if(!selectBox.contains(e.target)) {
+          list.classList.remove('show');
+          btn.setAttribute('aria-expanded', false);
+        }
+      });
+    })();
+
+    // --- 4. Sistema de Pré-visualização com Debounce ---
+    const urlInput = document.getElementById('url');
+    const form = document.getElementById('downloadForm');
+    let previewTimeout; 
+    let previewController; 
+
+    async function pasteClipboard() {
+      try {
+        const txt = await navigator.clipboard.readText();
+        urlInput.value = txt; 
+        urlInput.focus();
+        validateUrlInRealTime();
+        loadPreview(txt);
+      } catch { alert('Acesso à área de transferência negado.'); }
+    }
+
+    urlInput.addEventListener('keypress', (e) => {
+      if(e.key === 'Enter' && urlInput.value.trim()) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+
+    urlInput.addEventListener('input', () => {
+      validateUrlInRealTime();
+      clearTimeout(previewTimeout);
+      previewTimeout = setTimeout(() => {
+        loadPreview(urlInput.value);
+      }, 500);
+    });
+
+    function validateUrlInRealTime() {
+      const url = urlInput.value.trim();
+      const status = document.getElementById('urlStatus');
+      const isValid = /youtube\.com|youtu\.be/.test(url);
+      if(url.length === 0) {
+        status.textContent = '';
+        status.className = 'url-status';
+        return;
+      }
+      if(isValid) {
+        status.textContent = '✓';
+        status.className = 'url-status valid';
+      } else {
+        status.textContent = '✗';
+        status.className = 'url-status invalid';
+      }
+    }
+
+    async function loadPreview(uri) {
+      const p = document.getElementById('videoPreview');
+      if(!uri || uri.length < 8) { p.classList.remove('show'); return; }
+
+      if (previewController) previewController.abort();
+      previewController = new AbortController(); 
+
+      try {
+        const r = await fetch('/api/preview?url=' + encodeURIComponent(uri), {
+          signal: previewController.signal
+        });
+        if(!r.ok) throw new Error();
+        const d = await r.json();
+        
+        document.getElementById('previewImg').src = d.thumbnail;
+        document.getElementById('previewTitle').textContent = d.title;
+        const durationEl = document.getElementById('videoDuration');
+        const duration = d.duration_label ? ('Duração: ' + d.duration_label) : 'Duração: --';
+        durationEl.textContent = d.uploader ? (duration + ' • ' + d.uploader) : duration;
+        
+        p.classList.add('show');
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+        p.classList.remove('show'); 
+      }
+    }
+
+    // --- 5. Estado de Carregamento e Polling (Barra de Progresso) ---
+    const submitBtn = document.getElementById('submitBtn');
+    const progress = document.getElementById('progressBar');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const fill = document.getElementById('progressFill');
+    const txt = document.getElementById('progressText');
+    let progressInterval;
+
+    form.addEventListener('submit', () => {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('loading');
+      progress.classList.add('show');
+      cancelBtn.style.display = 'flex';
+      cancelBtn.disabled = false;
+      document.getElementById('cancelText').textContent = 'Cancelar Download';
+
+      clearInterval(progressInterval);
+      
+      progressInterval = setInterval(async () => {
+        try {
+          const id = downloadIdInput ? downloadIdInput.value : '';
+          const res = await fetch('/api/progress?id=' + id);
+          if(!res.ok) return;
+          const data = await res.json();
+
+          if (data.status === 'downloading') {
+            fill.style.width = data.percent.toFixed(1) + '%';
+            txt.textContent = `Baixando: ${data.percent.toFixed(1)}%`;
+          } else if (data.status === 'processing') {
+            fill.style.width = '100%';
+            txt.textContent = 'Otimizando formato nativo no servidor...';
+          }
+        } catch (e) {
+          console.error("Erro no polling:", e);
+        }
+      }, 1000);
+    });
+
+    window.addEventListener('pageshow', (e) => {
+      if(e.persisted || (window.performance && performance.getEntriesByType("navigation").length && performance.getEntriesByType("navigation")[0].type === "back_forward")) {
+        clearInterval(progressInterval);
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('loading');
+        progress.classList.remove('show');
+        cancelBtn.style.display = 'none';
+        if(fill) fill.style.width = '0%';
+        if(txt) txt.textContent = 'Conectando ao servidor...';
+        if(downloadIdInput) downloadIdInput.value = generateDownloadId(); // Renova o ID
+      }
+    });
+
+    // --- 6. Cancelar ---
+    function cancelDownload() {
+      cancelBtn.disabled = true;
+      document.getElementById('cancelText').textContent = 'Cancelando...';
+      
+      const formData = new FormData();
+      if(downloadIdInput) formData.append('download_id', downloadIdInput.value);
+      formData.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+
+      fetch('/download/cancel', {
+        method: 'POST',
+        body: formData
+      }).catch(()=>{});
+    }
+
+    // --- 7. Service Worker ---
+    if('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/js/sw.js').catch(()=>{});
+    }
+  </script>
+</body>
+</html>

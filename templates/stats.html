@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard | YT Download</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Animated Mesh Background -->
+  <div class="mesh-bg" aria-hidden="true">
+    <div class="mesh-blob mesh-1"></div>
+    <div class="mesh-blob mesh-2"></div>
+    <div class="mesh-blob mesh-3"></div>
+  </div>
+
+  <div class="container" style="max-width: 800px;">
+    <main class="glass-card">
+      <header class="header">
+        <h1 class="title">Downloads Recentes</h1>
+        <p class="subtitle">Registros de sucessos e falhas locais</p>
+      </header>
+
+      {% set success_count = stats | selectattr('status', 'equalto', 'success') | list | length %}
+      {% set error_count = stats | selectattr('status', 'equalto', 'error') | list | length %}
+      {% set cancelled_count = stats | selectattr('status', 'equalto', 'cancelled') | list | length %}
+      <section class="stats-kpis" aria-label="Resumo de atividade">
+        <article class="kpi-card">
+          <p class="kpi-label">Total</p>
+          <p class="kpi-value">{{ stats | length }}</p>
+        </article>
+        <article class="kpi-card ok">
+          <p class="kpi-label">Sucesso</p>
+          <p class="kpi-value">{{ success_count }}</p>
+        </article>
+        <article class="kpi-card err">
+          <p class="kpi-label">Falha</p>
+          <p class="kpi-value">{{ error_count }}</p>
+        </article>
+        <article class="kpi-card muted">
+          <p class="kpi-label">Cancelados</p>
+          <p class="kpi-value">{{ cancelled_count }}</p>
+        </article>
+      </section>
+
+      {% if stats %}
+      <div style="overflow-x: auto;">
+        <table class="stats-table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Formato</th>
+              <th>URL</th>
+              <th>Qualidade</th>
+              <th>Tamanho</th>
+              <th>Data (UTC)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in stats %}
+            <tr>
+              <td>
+                {% if item.status == 'success' %}
+                  <span class="badge ok">✓ OK</span>
+                {% elif item.status == 'cancelled' %}
+                  <span class="badge warn">◌ Cancelado</span>
+                {% else %}
+                  <span class="badge err">✗ Falha</span>
+                {% endif %}
+              </td>
+              <td><span class="badge">{{ item.format | upper }}</span></td>
+              <td class="monospace td-url" title="{{ item.url }}">{{ item.url }}</td>
+              <td>{{ item.quality | default('best') }}</td>
+              <td>{{ (item.size_bytes // (1024*1024)) ~ ' MB' if item.size_bytes else '—' }}</td>
+              <td class="td-date">{{ item.timestamp[:19] | replace('T', ' ') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">Nenhum arquivo processado recentemente.</div>
+      {% endif %}
+
+      <div class="note" style="margin-top:40px;">
+        <a href="/">← Voltar ao início</a>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

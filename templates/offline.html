@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Offline | YT Download</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body { display:flex; align-items:center; justify-content:center; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="mesh-bg">
+    <div class="mesh-blob mesh-1"></div>
+    <div class="mesh-blob mesh-2"></div>
+  </div>
+  <div class="container" style="max-width:520px;">
+    <div class="glass-card" style="text-align:center;">
+      <div class="logo-icon">🔌</div>
+      <h1 class="title">Você está offline</h1>
+      <p class="subtitle" style="margin-top:16px;">
+        Sem internet não conseguimos consultar o vídeo no YouTube nem iniciar a conversão.
+      </p>
+      <div class="offline-tips" aria-label="Dicas rápidas">
+        <p>1. Verifique sua conexão de rede.</p>
+        <p>2. Tente atualizar a página.</p>
+        <p>3. Aguarde alguns segundos e tente novamente.</p>
+      </div>
+      <div class="offline-actions">
+        <button class="btn-submit" onclick="window.location.reload()" style="max-width:240px;margin:24px auto 0;">
+          Tentar novamente
+        </button>
+        <a class="offline-link" href="/">Voltar para o início</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
