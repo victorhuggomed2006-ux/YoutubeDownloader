@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: youtube-downloader
+    env: python3
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 4 -b 0.0.0.0:$PORT app:app
+    plan: free

@@ -1,0 +1,6 @@
+.repro
+{
+  "run": "python app.py",
+  "compile": "pip install -r requirements.txt",
+  "onBoot": "echo 'Iniciando YouTube Downloader...'"
+}
