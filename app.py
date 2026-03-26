@@ -168,15 +168,24 @@ def format_duration(seconds):
 def get_ydl_common_opts():
     """Opções comuns para yt-dlp com headers para contornar verificação de bot"""
     return {
-        'quiet': True,
-        'no_warnings': True,
+        'quiet': False,
+        'no_warnings': False,
         'noplaylist': True,
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9',
         },
-        'socket_timeout': 30,
-        'retries': 3,
+        'socket_timeout': 60,
+        'retries': 5,
+        'fragment_retries': 5,
+        'skip_unavailable_fragments': True,
+        'extractor_args': {
+            'youtube': {
+                'skip': ['dash', 'hls'],
+                'lang': ['en'],
+            }
+        },
+        'youtube_include_dash_manifest': False,
     }
 
 
@@ -209,18 +218,29 @@ def preview_video_info():
     opts = get_ydl_common_opts()
     opts['skip_download'] = True
 
-    try:
-        with YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-        return jsonify({
-            'title': info.get('title') or 'Sem título',
-            'thumbnail': info.get('thumbnail') or '',
-            'duration': info.get('duration') or 0,
-            'duration_label': format_duration(info.get('duration')),
-            'uploader': info.get('uploader') or 'Canal desconhecido',
-        })
-    except DownloadError:
-        return jsonify({'error': 'Não foi possível carregar os dados do vídeo'}), 422
+    # Tentar múltiplas vezes com delay
+    for attempt in range(3):
+        try:
+            with YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+            return jsonify({
+                'title': info.get('title') or 'Sem título',
+                'thumbnail': info.get('thumbnail') or '',
+                'duration': info.get('duration') or 0,
+                'duration_label': format_duration(info.get('duration')),
+                'uploader': info.get('uploader') or 'Canal desconhecido',
+            })
+        except DownloadError as e:
+            if attempt < 2:
+                time.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
+                continue
+            return jsonify({'error': 'Não foi possível carregar os dados do vídeo'}), 422
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+                continue
+            logger.error(f'Erro ao carregar preview: {str(e)[:150]}')
+            return jsonify({'error': 'Erro ao carregar vídeo. Tente novamente.'}), 422
 
 
 @app.route('/stats', methods=['GET'])
@@ -329,19 +349,37 @@ def download():
         ydl_opts['progress_hooks'] = [hook]
         
         with YoutubeDL(ydl_opts) as ydl:
-            try:
-                info = ydl.extract_info(url, download=False)
-            except DownloadError as e:
-                err_msg = str(e).lower()
-                if 'private' in err_msg or 'not available' in err_msg:
-                    raise ValueError('Vídeo é privado, restrito ou foi removido.')
-                elif 'age' in err_msg:
-                    raise ValueError('Vídeo requer verificação de idade.')
-                else:
-                    raise ValueError(f'Erro ao obter informações: {str(e)[:100]}')
-            except Exception as e:
-                logger.exception(f'Falha ao extrair info de {url}')
-                raise ValueError('Erro ao extrair informações do vídeo')
+            info = None
+            last_error = None
+            
+            # Tentar extrair info com retry
+            for attempt in range(3):
+                try:
+                    info = ydl.extract_info(url, download=False)
+                    break
+                except DownloadError as e:
+                    last_error = e
+                    err_msg = str(e).lower()
+                    if 'private' in err_msg or 'not available' in err_msg:
+                        raise ValueError('Vídeo é privado, restrito ou foi removido.')
+                    elif 'age' in err_msg:
+                        raise ValueError('Vídeo requer verificação de idade.')
+                    elif attempt < 2:
+                        time.sleep(2 ** attempt)  # Exponential backoff
+                        continue
+                    else:
+                        raise ValueError(f'Erro ao obter informações: {str(e)[:100]}')
+                except Exception as e:
+                    last_error = e
+                    if attempt < 2:
+                        time.sleep(2 ** attempt)
+                        continue
+                    else:
+                        logger.exception(f'Falha ao extrair info de {url}')
+                        raise ValueError('Erro ao extrair informações do vídeo')
+            
+            if info is None:
+                raise ValueError('Não foi possível obter informações do vídeo após várias tentativas')
 
             size = 0
             try:
