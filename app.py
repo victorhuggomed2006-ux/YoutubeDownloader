@@ -171,34 +171,30 @@ def format_duration(seconds):
 
 
 def get_ydl_common_opts():
-    """Opções comuns para yt-dlp com máximo esforço contra bot detection"""
+    """Opções comuns para yt-dlp - usa cliente Android/iOS para bypassar bot detection"""
     return {
         'quiet': False,
         'no_warnings': False,
         'noplaylist': True,
         'no_check_certificates': True,
+        # User-Agent do Android YouTube app - não exige verificação anti-bot
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+            'User-Agent': 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'DNT': '1',
-            'Referer': 'https://www.youtube.com/',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
+            'X-YouTube-Client-Name': '3',
+            'X-YouTube-Client-Version': '19.09.37',
         },
-        'socket_timeout': 120,
-        'retries': 10,
-        'fragment_retries': 10,
+        'socket_timeout': 30,
+        'retries': 3,
+        'fragment_retries': 3,
         'skip_unavailable_fragments': True,
+        # Tentar Android primeiro, depois iOS, depois web - Android bypassa bot detection
         'extractor_args': {
             'youtube': {
-                'skip': ['dash', 'hls'],
-                'lang': ['en'],
+                'player_client': ['android', 'ios', 'web'],
+                'skip': ['hls'],
             }
         },
-        'youtube_include_dash_manifest': False,
-        'youtube_ignore_age_gate': True,
     }
 
 
@@ -357,8 +353,8 @@ def preview_video_info():
     opts = get_ydl_common_opts()
     opts['skip_download'] = True
 
-    # ─── Strategy 1: yt-dlp (2 attempts, short timeout on Vercel) ───
-    max_ydl_attempts = 1 if IS_VERCEL else 2
+    # ─── Strategy 1: yt-dlp com cliente Android (bypassa bot detection) ───
+    max_ydl_attempts = 2
     for attempt in range(max_ydl_attempts):
         try:
             logger.info(f'Preview yt-dlp attempt {attempt + 1}/{max_ydl_attempts}')
@@ -451,16 +447,6 @@ def download():
     if not validate_youtube_url(url):
         flash('URL inválida. Insira um link válido do YouTube.')
         return redirect(url_for('index'))
-
-    # ─── VERCEL MODE: Show download alternatives ───
-    if IS_VERCEL:
-        video_id = extract_video_id(url)
-        logger.info(f'VERCEL MODE: Mostrando alternativas de download para {video_id}')
-        return render_template('download_alternatives.html', 
-                               url=url, 
-                               video_id=video_id,
-                               format=fmt,
-                               quality=quality)
 
     tmpdir = tempfile.mkdtemp(dir=DOWN_DIR, prefix='ydl_')
 
