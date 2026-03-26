@@ -1,214 +1,209 @@
-# YouTube Downloader (Flask + yt-dlp)
+# YouTube Downloader
 
-Aplicação web limpa e moderna para baixar vídeos (MP4) ou áudios (MP3) do YouTube com interface responsiva e PWA.
+Aplicação web para baixar vídeos e áudios do YouTube. Interface simples, funcional e responsiva.
 
-## ✨ Features
+## Funcionalidades
 
-- 🎥 Baixe vídeos em múltiplas qualidades (360p até 4K)
-- 🎵 Extração de áudio em MP3 com qualidade 192kbps
-- 🌓 Tema automático claro/escuro
-- ✅ Validação em tempo real de URLs do YouTube
-- 🔐 Proteção CSRF e rate limiting
-- 📊 Dashboard de estatísticas (localhost)
-- 📱 Design responsivo e PWA com suporte offline
-- ⌨️ Atalho Enter para submit
-- 🛑 Botão de cancelamento de download
-- 📝 Logging estruturado com persistência de stats em JSON
+- Baixa vídeos em várias qualidades (360p até 4K)
+- Extrai áudio em MP3 (192kbps)
+- Tema claro/escuro automático
+- Valida URLs do YouTube em tempo real
+- Proteção contra CSRF e rate limiting
+- Dashboard com estatísticas de downloads
+- Funciona offline com PWA
+- Cancelamento de download
+- Logging estruturado com histórico em JSON
 
-## 🚀 Início Rápido
+## Começando
 
-### Requisitos
+### Pré-requisitos
+
 - Python 3.8+
-- FFmpeg (para conversão MP3)
+- FFmpeg (para converter para MP3)
 
 ### Instalação
 
+Clonar ou extrair o projeto:
+
 ```bash
-# Clonar/extrair projeto
 cd "Youtube Download"
+```
 
-# (Opcional) Criar ambiente virtual
+Criar um ambiente virtual (recomendado):
+
+```bash
 python -m venv venv
-venv/Scripts/activate  # Windows
-# ou source venv/bin/activate  # macOS/Linux
+venv\Scripts\activate  # Windows
+# ou
+source venv/bin/activate  # macOS/Linux
+```
 
-# Instalar dependências
+Instalar as dependências:
+
+```bash
 pip install -r requirements.txt
 ```
 
 ### Configuração
 
-Criar arquivo `.env` com suas configurações (opcional):
+Copie o arquivo de exemplo:
 
 ```bash
 cp .env.example .env
 ```
 
-Editar `.env` conforme necessário:
+Edite `.env` se precisar customizar:
 
 ```env
 SECRET_KEY=sua-chave-secreta-aqui
 DEBUG=False
 PORT=5000
 MAX_FILE_SIZE_MB=1200
-ADMIN_TOKEN=seu-token-admin  # para /stats em produçao
+ADMIN_TOKEN=seu-token-admin
 ```
 
 ### Executar
 
 ```bash
 python app.py
-# Abrir http://localhost:5000 no navegador
 ```
 
-## 📖 Uso
+Abra http://localhost:5000 no navegador.
 
-1. **Colar/digitar URL** do YouTube
-   - Validação em tempo real com ✓/✗
-   - A duração e informações aparecem automaticamente
-   
-2. **Escolher formato**
-   - MP4 (vídeo com qualidades de 360p a 4K)
-   - MP3 (áudio em 192kbps)
-   
-3. **Selecionar qualidade** (para vídeo)
-   - Máxima resolução
-   - FHD (1080p)
-   - HD (720p)
-   - Standard (480p)
-   
-4. **Iniciar download**
-   - Pressionar botão ou Enter na URL
-   - Acompanhar progresso
-   - Cancelar a qualquer momento
+## Como usar
 
-## 📊 Dashboard de Stats
+1. Cole a URL do YouTube no campo
+   - A validação acontece enquanto você digita
+   - As informações do vídeo carregam automaticamente
 
-Acesse estatísticas de downloads em:
-- `http://localhost:5000/stats` (localhost apenas)
-- `http://localhost:5000/stats?token=seu-admin-token` (com token)
+2. Escolha o formato
+   - MP4 (vídeo)
+   - MP3 (áudio)
 
-Mostra:
-- Status (✓ OK ou ✗ Falha)
-- Formato usado
-- URL do vídeo
-- Tamanho do arquivo
-- Timestamp
+3. Para vídeo, selecione a qualidade
+   - Máxima
+   - 1080p
+   - 720p
+   - 480p
+   - 360p
 
-## ⚙️ Configuração Avançada
+4. Inicie o download
+   - Clique no botão ou pressione Enter
+   - Acompanhe o progresso
+   - Pode cancelar a qualquer momento
 
-### Variáveis de Ambiente (.env)
+## Statisticas
 
-| Var | Padrão | Descrição |
-|-----|--------|-----------|
-| `SECRET_KEY` | dev-key | Chave secreta Flask (mude em produção!) |
-| `DEBUG` | False | Modo debug |
-| `HOST` | 0.0.0.0 | Host para binding |
-| `PORT` | 5000 | Porta |
-| `MAX_FILE_SIZE_MB` | 1200 | Tamanho máximo em MB |
-| `ADMIN_TOKEN` | (vazio) | Token para acessar /stats em produção |
-| `FFMPEG_PATH` | auto | Caminho customizado para FFmpeg |
+Acesse o histórico de downloads em:
 
-### Rate Limiting
+http://localhost:5000/stats
 
-Por padrão: **3 downloads por minuto**, 60 requisições por minuto geral.
+Ou com token para produção:
 
-Editar em `app.py`:
+http://localhost:5000/stats?token=seu-admin-token
+
+Mostra informações sobre cada download: status, formato, URL, tamanho e data.
+
+## Configuração
+
+### Variáveis de ambiente
+
+| Variável | Padrão | O que faz |
+|----------|--------|----------|
+| SECRET_KEY | dev-key | Chave para segurança (mude em produção) |
+| DEBUG | False | Modo debug |
+| HOST | 0.0.0.0 | Endereço para bind |
+| PORT | 5000 | Porta do servidor |
+| MAX_FILE_SIZE_MB | 1200 | Tamanho máximo em MB |
+| ADMIN_TOKEN | - | Token para acessar stats em produção |
+| FFMPEG_PATH | auto | Caminho customizado para FFmpeg |
+
+### Rate limiting
+
+Por padrão está limitado a 3 downloads por minuto e 60 requisições por minuto no geral.
+
+Para mudar, edite em `app.py`:
+
 ```python
 limiter = Limiter(
     key_func=get_remote_address,
     app=app,
-    default_limits=["60 per minute"],  # ← Alterar aqui
+    default_limits=["60 per minute"],  # Alterar aqui
 )
 ```
 
-## 🛡️ Segurança
+## Segurança
 
-- ✅ CSRF protection (flask-wtf)
-- ✅ Rate limiting
-- ✅ Security headers (X-Frame-Options, X-Content-Type-Options, etc)
-- ✅ Validação de URL no backend e frontend
-- ✅ Limite de tamanho de arquivo
-- ✅ Limpeza automática de arquivos temporários
+- CSRF protection (flask-wtf)
+- Rate limiting
+- Security headers padronizados
+- Validação de URL no cliente e servidor
+- Limite de tamanho de arquivo
+- Limpeza automática de arquivos temporários
 
-## 📝 Logging
+## Logs
 
-Logs salvo em `download.log` com:
-- Timestamp
-- Nível (INFO, ERROR, etc)
-- Função/linha
-- Mensagem estruturada
+Os downloads são registrados em `download.log`:
 
-Exemplo:
 ```
-[2026-03-24 14:30:25] INFO - download:185 - ✓ Download bem-sucedido: mp4 720p (245MB) de 192.168.1.100
+[2026-03-24 14:30:25] INFO - download:185 - Download bem-sucedido: mp4 720p (245MB) de 192.168.1.100
+[2026-03-24 14:35:10] ERROR - download:220 - Erro no download: Vídeo privado
 ```
 
-## 📊 Persistência de Stats
+## Histórico
 
-Downloads são salvos em `stats.json` com:
-- Timestamp
-- URL
-- Formato
-- Qualidade
-- Status (success/error)
-- Tamanho
-- IP do cliente
+Os downloads são salvos em `stats.json` com timestamp, URL, formato, qualidade, status, tamanho e IP.
 
-## 🌐 PWA & Offline
+## PWA e offline
 
 - Manifesto PWA em `/static/manifest.json`
-- Service Worker com cache estratégico
+- Service Worker com cache
 - Página offline em `/offline.html`
 
-## ⚠️ Notas Importantes
+## Observações
 
-- **FFmpeg**: Necessário para converter MP3. Se não instalado, fallback para M4A
-- **YouTube TOS**: Use respeitando os termos de serviço do YouTube
-- **Playlists**: Desabilitadas por padrão (proteção de banda)
-- **Atualização yt-dlp**: `pip install --upgrade yt-dlp`
+- FFmpeg é necessário para converter para MP3. Se não estiver instalado, o app tenta usar o M4A
+- Respeite os termos de serviço do YouTube
+- Playlists estão desabilitadas por padrão
+- Para atualizar o yt-dlp, use: `pip install --upgrade yt-dlp`
 
-## 🐛 Troubleshooting
+## Problemas comuns
 
-### "FFmpeg not found"
+### FFmpeg não encontrado
 
-Instalar FFmpeg:
+Instale FFmpeg:
 
-**Windows (Chocolatey)**:
+Windows (Chocolatey):
 ```powershell
 choco install ffmpeg
 ```
 
-**macOS (Homebrew)**:
+macOS (Homebrew):
 ```bash
 brew install ffmpeg
 ```
 
-**Linux (Ubuntu/Debian)**:
+Linux (Ubuntu/Debian):
 ```bash
 sudo apt-get install ffmpeg
 ```
 
-### "Video not downloadable"
+### Vídeo não faz download
 
-- Vídeo é privado, restrito, ou foi removido
-- Canal requer verificação de idade
-- Região bloqueada
-- Tente URL diferente
+- Pode ser privado ou restrito
+- Pode estar bloqueado por região
+- Pode exigir verificação de idade
+- Tente outra URL
 
-## 📈 Roadmap Futuro
+## Planos futuros
 
-- [ ] Suporte a Playlists (com limite de vídeos)
-- [ ] Download paralelo de múltiplos vídeos
-- [ ] UI para upload e processamento de vídeos locais
-- [ ] Autenticação simples para /stats
-- [ ] Histórico local (IndexedDB)
-- [ ] Dark mode persistente no localStorage
-
-## 📄 Licença
-
-Projeto educacional. Use responsavelmente.
+- Suporte a playlists
+- Download paralelo de múltiplos vídeos
+- Interface para processar vídeos locais
+- Autenticação para o dashboard
+- Histórico local no navegador
+- Dark mode persistente
 
 ---
 
-**Desenvolvido com ❤️ em Flask + Vanilla JS**
+Projeto educacional, feito em Flask e JavaScript vanilla.
