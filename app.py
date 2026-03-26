@@ -211,34 +211,47 @@ def extract_video_id(url):
 
 def get_video_info_invidious(video_id):
     """Tenta obter info via API do Invidious (fallback do YouTube)"""
-    try:
-        # Tenta múltiplos servidores Invidious
-        servers = [
-            'https://inv.nadeko.net',
-            'https://invidious.io',
-            'https://iv.ggtyler.dev',
-        ]
-        
-        for server in servers:
-            try:
-                url = f'{server}/api/v1/videos/{video_id}'
-                response = requests.get(url, timeout=10)
-                if response.status_code == 200:
-                    data = response.json()
-                    return {
-                        'title': data.get('title', 'Sem título'),
-                        'thumbnail': data.get('posterUrl', '').replace('/ggpht/', 'https://yt4.ggpht.com/'),
-                        'duration': data.get('lengthSeconds', 0),
-                        'uploader': data.get('author', 'Canal desconhecido'),
-                    }
-            except Exception as e:
-                logger.warning(f'Invidious server {server} falhou: {str(e)[:50]}')
-                continue
-        
-        return None
-    except Exception as e:
-        logger.error(f'Erro no Invidious: {str(e)[:100]}')
-        return None
+    servers = [
+        'https://inv.nadeko.net',
+        'https://invidious.io',
+        'https://iv.ggtyler.dev',
+    ]
+    
+    logger.info(f'Invidious: Tentando extrair info para video_id={video_id} (tentando {len(servers)} servidores)')
+    
+    for server in servers:
+        try:
+            url = f'{server}/api/v1/videos/{video_id}'
+            logger.info(f'Invidious: Fazendo request para {server}')
+            response = requests.get(url, timeout=10)
+            logger.info(f'Invidious: Status {response.status_code} de {server}')
+            
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f'Invidious: Recebido JSON de {server}')
+                result = {
+                    'title': data.get('title', 'Sem título'),
+                    'thumbnail': data.get('posterUrl', '').replace('/ggpht/', 'https://yt4.ggpht.com/'),
+                    'duration': data.get('lengthSeconds', 0),
+                    'uploader': data.get('author', 'Canal desconhecido'),
+                }
+                logger.info(f'Invidious: Sucesso! Título: {result.get("title", "")[:50]}')
+                return result
+            else:
+                logger.warning(f'Invidious: {server} retornou status {response.status_code}, tentando próximo')
+                
+        except requests.exceptions.Timeout:
+            logger.warning(f'Invidious: Timeout ao conectar em {server}')
+            continue
+        except requests.exceptions.ConnectionError as e:
+            logger.warning(f'Invidious: Erro de conexão em {server}: {str(e)[:60]}')
+            continue
+        except Exception as e:
+            logger.warning(f'Invidious: Erro ao processar {server}: {str(e)[:80]}')
+            continue
+    
+    logger.error(f'Invidious: Todos os {len(servers)} servidores falharam para video_id={video_id}')
+    return None
 
 
 # ─── Routes ───
@@ -264,10 +277,14 @@ def cancel_download():
 @limiter.limit("20 per minute")
 def preview_video_info():
     url = request.args.get('url', '').strip()
+    logger.info(f'Preview request para URL: {url}')
+    
     if not url or not validate_youtube_url(url):
+        logger.error(f'URL inválida: {url}')
         return jsonify({'error': 'URL inválida'}), 400
 
     video_id = extract_video_id(url)
+    logger.info(f'Video ID extraído: {video_id}')
     
     opts = get_ydl_common_opts()
     opts['skip_download'] = True
@@ -287,26 +304,37 @@ def preview_video_info():
                 'uploader': info.get('uploader') or 'Canal desconhecido',
             })
         except Exception as e:
-            logger.warning(f'yt-dlp falhou attempt {attempt + 1}: {str(e)[:80]}')
+            err_msg = str(e)[:150]
+            logger.warning(f'yt-dlp falhou attempt {attempt + 1}: {err_msg}')
             if attempt < 1:
                 time.sleep(2)
                 continue
     
     # Fallback: Tentar Invidious (proxy do YouTube)
-    if video_id:
-        logger.info(f'Tentando Invidious para {video_id}')
-        invidious_info = get_video_info_invidious(video_id)
-        if invidious_info:
-            logger.info('Invidious sucesso!')
-            return jsonify({
-                'title': invidious_info.get('title', 'Sem título'),
-                'thumbnail': invidious_info.get('thumbnail', ''),
-                'duration': invidious_info.get('duration', 0),
-                'duration_label': format_duration(invidious_info.get('duration')),
-                'uploader': invidious_info.get('uploader', 'Canal desconhecido'),
-            })
+    logger.info(f'Yt-dlp falhou. Passando para Invidious. Video ID: {video_id}')
     
-    logger.error('Todos os métodos falharam')
+    if video_id:
+        logger.info(f'Iniciando Invidious para video_id={video_id}')
+        try:
+            invidious_info = get_video_info_invidious(video_id)
+            logger.info(f'Invidious retornou: {invidious_info is not None}')
+            if invidious_info:
+                logger.info('Invidious sucesso! Retornando dados.')
+                return jsonify({
+                    'title': invidious_info.get('title', 'Sem título'),
+                    'thumbnail': invidious_info.get('thumbnail', ''),
+                    'duration': invidious_info.get('duration', 0),
+                    'duration_label': format_duration(invidious_info.get('duration')),
+                    'uploader': invidious_info.get('uploader', 'Canal desconhecido'),
+                })
+            else:
+                logger.warning('Invidious retornou None/vazio')
+        except Exception as inv_error:
+            logger.error(f'Erro ao chamar Invidious: {str(inv_error)[:150]}')
+    else:
+        logger.error(f'Não foi possível extrair video_id da URL: {url}')
+    
+    logger.error('Todos os métodos falharam - returnando 429')
     return jsonify({'error': 'YouTube e proxies estão bloqueando. Tente mais tarde ou use outro vídeo.'}), 429
 
 
