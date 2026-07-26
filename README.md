@@ -8,9 +8,9 @@
 [![Versão](https://img.shields.io/github/v/release/victorhuggomed2006-ux/YoutubeDownloader)](https://github.com/victorhuggomed2006-ux/YoutubeDownloader/releases/latest)
 [![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue.svg)](source-code/LICENSE)
 
-### [⬇️ Baixar o instalador](YouTubeDownloader-1.2.0-Setup.msi)
+### [⬇️ Baixar o instalador](https://github.com/victorhuggomed2006-ux/YoutubeDownloader/raw/main/YouTubeDownloader-1.2.0-Setup.msi)
 
-*96 MB · Windows 10 ou 11 de 64 bits*
+*96 MB · Windows 10 ou 11 de 64 bits · o download começa na hora*
 
 ![Janela principal](source-code/docs/captura-tela-escuro.png)
 
@@ -20,9 +20,11 @@
 
 ## Como instalar
 
-Clique no link acima e depois no botão **Download** da página do arquivo. Dê
-dois cliques no que baixar, escolha se quer o atalho na Área de Trabalho e
-conclua.
+Clique no link acima — o download começa imediatamente. Dê dois cliques no
+arquivo baixado, escolha se quer o atalho na Área de Trabalho e conclua.
+
+Se preferir, o instalador também está na
+[página de releases](https://github.com/victorhuggomed2006-ux/YoutubeDownloader/releases/latest).
 
 **Não pede permissão de administrador** e não exige instalar Python, FFmpeg nem
 qualquer outra coisa — está tudo dentro do instalador.
