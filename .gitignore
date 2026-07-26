@@ -1,0 +1,20 @@
+# O desenvolvimento acontece dentro de source-code/, que tem o próprio
+# .gitignore. Este arquivo cobre apenas o que possa sobrar na raiz.
+
+venv/
+.venv/
+build/
+dist/
+.coverage
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+
+# Editores e sistema
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+# O instalador publicado É versionado, ao contrário do resto de dist/.
+!YouTubeDownloader-*-Setup.msi

@@ -1,0 +1,11 @@
+-r requirements.txt
+
+# Testes
+pytest>=8.0
+pytest-cov>=5.0
+
+# Qualidade de código (as mesmas verificações que a CI roda)
+ruff>=0.6
+
+# Empacotamento
+pyinstaller>=6.11

@@ -1,0 +1,108 @@
+# Verificação de cada push e pull request: linter e testes.
+#
+# Todo o projeto Python vive em source-code/, então os jobs rodam a partir de
+# lá. O build completo do instalador não roda aqui — ele exige baixar o FFmpeg
+# (~200 MB) e leva vários minutos. Isso fica no workflow de release.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "source-code/docs/**"
+      - "LICENSE"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # Um push novo cancela a verificação anterior do mesmo branch.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: source-code
+
+jobs:
+  lint:
+    name: Linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar o ruff
+        run: pip install ruff
+
+      - name: Verificar o estilo
+        run: ruff check --output-format=github .
+
+      - name: Verificar a formatação
+        run: ruff format --check .
+
+  tests:
+    name: Testes (Python ${{ matrix.python }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # A versão mínima suportada e a mais recente estável. As do meio
+        # raramente quebram sozinhas e dobrariam o tempo de espera.
+        python: ["3.10", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: source-code/requirements-dev.txt
+
+      - name: Instalar as dependências
+        run: pip install -r requirements-dev.txt
+
+      - name: Rodar os testes
+        run: pytest --cov --cov-report=xml --cov-report=term
+
+      - name: Enviar a cobertura
+        if: matrix.python == '3.13'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura
+          path: source-code/coverage.xml
+          retention-days: 14
+
+  build-check:
+    name: O aplicativo abre?
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: source-code/requirements-dev.txt
+
+      - name: Instalar as dependências
+        run: pip install -r requirements-dev.txt
+
+      - name: Gerar ícones e traduções
+        run: |
+          python packaging/make_icon.py
+          powershell -ExecutionPolicy Bypass -File packaging/build_translations.ps1 -SomenteCompilar
+
+      # Sem isso o Qt não encontra plataforma gráfica no runner e a janela
+      # nem chega a ser criada.
+      - name: Abrir a janela em modo invisível
+        env:
+          QT_QPA_PLATFORM: offscreen
+          PYTHONPATH: .
+        run: python -c "from PySide6.QtWidgets import QApplication; from PySide6.QtCore import QTimer; from ytdownloader.core.settings import SettingsStore; from ytdownloader.core.history import HistoryStore; from ytdownloader.gui.main_window import MainWindow; app = QApplication([]); w = MainWindow(SettingsStore(), HistoryStore()); w.show(); QTimer.singleShot(1500, app.quit); raise SystemExit(app.exec())"

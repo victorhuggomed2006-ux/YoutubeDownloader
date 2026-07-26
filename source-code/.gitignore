@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+ENV/
+
+# Empacotamento (PyInstaller / WiX)
+build/
+dist/
+packaging/vendor/
+packaging/version_info.txt
+*.wixpdb
+*.wixobj
+
+# O instalador publicado fica versionado na raiz do repositório, um nível acima
+# desta pasta, para ficar visível na listagem. Atenção: o GitHub recusa arquivos
+# acima de 100 MB, e cada versão adicionada permanece no histórico para sempre.
+
+# Dados locais gerados pelo app
+*.log
+settings.json
+history.json
+
+# Editores / SO
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
