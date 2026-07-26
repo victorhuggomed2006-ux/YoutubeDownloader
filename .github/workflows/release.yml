@@ -141,7 +141,11 @@ jobs:
 
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add -A
+
+          # Only the installer. The build regenerates the icons byte for byte
+          # differently on every run, and "git add -A" would commit that churn
+          # along with it.
+          git add -- 'YouTubeDownloader-*-Setup.msi'
           if (git diff --cached --quiet) {
             Write-Host 'The installer in the root was already up to date.'
           } else {

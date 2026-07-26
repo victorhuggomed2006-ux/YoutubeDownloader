@@ -10,7 +10,7 @@
 
 ### [⬇️ Download the installer](https://github.com/victorhuggomed2006-ux/YoutubeDownloader/raw/main/YouTubeDownloader-1.3.0-Setup.msi)
 
-*94 MB · Windows 10 or 11, 64-bit · the download starts immediately*
+*96 MB · Windows 10 or 11, 64-bit · the download starts immediately*
 
 ![Main window](source-code/docs/screenshot-dark.png)
 
