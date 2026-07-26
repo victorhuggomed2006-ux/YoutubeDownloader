@@ -1,8 +1,8 @@
-"""Testes da atualização do yt-dlp.
+"""Tests for the yt-dlp update mechanism.
 
-Este é o módulo mais sensível do projeto: ele baixa um pacote da internet e o
-coloca no ``sys.path``, de onde o código será importado e executado. Os testes
-aqui existem sobretudo para garantir que as defesas continuem no lugar.
+This is the most sensitive module in the project: it downloads a package from
+the internet and puts it on ``sys.path``, from where the code will be imported
+and executed. These tests exist above all to keep the defences in place.
 """
 
 from __future__ import annotations
@@ -18,23 +18,23 @@ from ytdownloader.core import paths, updater
 
 
 @pytest.fixture(autouse=True)
-def pasta_isolada(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Mantém a pasta real do usuário fora dos testes."""
-    destino = tmp_path / "runtime"
-    destino.mkdir()
-    monkeypatch.setattr(paths, "runtime_dir", lambda: destino)
-    return destino
+def isolated_folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Keep the real user folder out of the tests."""
+    destination = tmp_path / "runtime"
+    destination.mkdir()
+    monkeypatch.setattr(paths, "runtime_dir", lambda: destination)
+    return destination
 
 
-def _wheel(arquivos: dict[str, str]) -> bytes:
+def _wheel(files: dict[str, str]) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as z:
-        for nome, conteudo in arquivos.items():
-            z.writestr(nome, conteudo)
+        for name, content in files.items():
+            z.writestr(name, content)
     return buffer.getvalue()
 
 
-def _wheel_valido() -> bytes:
+def _valid_wheel() -> bytes:
     return _wheel(
         {
             "yt_dlp/__init__.py": "__version__ = '2030.1.1'\n",
@@ -43,7 +43,7 @@ def _wheel_valido() -> bytes:
     )
 
 
-class _RespostaFalsa:
+class _FakeResponse:
     def __init__(self, payload: bytes) -> None:
         self._payload = payload
 
@@ -55,169 +55,171 @@ class _RespostaFalsa:
             yield self._payload[i : i + chunk_size]
 
 
-def _fingir_download(monkeypatch: pytest.MonkeyPatch, payload: bytes) -> None:
+def _fake_download(monkeypatch: pytest.MonkeyPatch, payload: bytes) -> None:
     import requests
 
-    monkeypatch.setattr(requests, "get", lambda *a, **k: _RespostaFalsa(payload))
+    monkeypatch.setattr(requests, "get", lambda *a, **k: _FakeResponse(payload))
 
 
-# ── Comparação de versões ────────────────────────────────────────────────
+# ── Version comparison ───────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(
-    ("texto", "esperado"),
+    ("text", "expected"),
     [
         ("2026.7.4", (2026, 7, 4)),
         ("2026.07.04", (2026, 7, 4)),
         ("1.0", (1, 0)),
         ("", (0,)),
-        ("nao-e-versao", (0,)),
+        ("not-a-version", (0,)),
     ],
 )
-def test_interpreta_versoes(texto: str, esperado: tuple) -> None:
-    assert updater.parse_version(texto) == esperado
+def test_parses_versions(text: str, expected: tuple) -> None:
+    assert updater.parse_version(text) == expected
 
 
-def test_ordem_das_versoes_e_numerica_nao_alfabetica() -> None:
-    """Comparado como texto, "2026.10.1" viria antes de "2026.9.1"."""
+def test_version_order_is_numeric_not_alphabetical() -> None:
+    """Compared as text, "2026.10.1" would come before "2026.9.1"."""
     assert updater.parse_version("2026.10.1") > updater.parse_version("2026.9.1")
     assert updater.parse_version("2027.1.1") > updater.parse_version("2026.12.31")
 
 
-# ── Instalação ───────────────────────────────────────────────────────────
+# ── Installation ─────────────────────────────────────────────────────────
 
 
-def test_instala_e_deixa_o_pacote_utilizavel(
-    monkeypatch: pytest.MonkeyPatch, pasta_isolada: Path
+def test_installs_and_leaves_a_usable_package(
+    monkeypatch: pytest.MonkeyPatch, isolated_folder: Path
 ) -> None:
-    payload = _wheel_valido()
-    _fingir_download(monkeypatch, payload)
+    payload = _valid_wheel()
+    _fake_download(monkeypatch, payload)
     digest = hashlib.sha256(payload).hexdigest()
 
-    destino = updater.install("2030.1.1", "https://exemplo/pacote.whl", digest)
+    destination = updater.install("2030.1.1", "https://example/package.whl", digest)
 
-    assert destino.is_dir()
-    assert (destino / "yt_dlp" / "__init__.py").is_file()
-    assert destino.parent == pasta_isolada
-
-
-def test_recusa_pacote_com_soma_de_verificacao_errada(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Sem esta checagem, qualquer coisa devolvida pela rede seria importada."""
-    _fingir_download(monkeypatch, _wheel_valido())
-
-    with pytest.raises(RuntimeError, match="integridade"):
-        updater.install("2030.1.1", "https://exemplo/pacote.whl", "0" * 64)
+    assert destination.is_dir()
+    assert (destination / "yt_dlp" / "__init__.py").is_file()
+    assert destination.parent == isolated_folder
 
 
-def test_recusa_pacote_que_escapa_da_pasta_de_destino(
+def test_rejects_a_package_with_the_wrong_checksum(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without this check, anything the network returned would be imported."""
+    _fake_download(monkeypatch, _valid_wheel())
+
+    with pytest.raises(RuntimeError, match="integrity"):
+        updater.install("2030.1.1", "https://example/package.whl", "0" * 64)
+
+
+def test_rejects_a_package_that_escapes_the_destination(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Zip Slip: um arquivo com '..' no caminho sobrescreveria arquivos fora da
-    pasta de destino — inclusive o próprio executável do aplicativo."""
-    malicioso = _wheel(
+    """Zip Slip: a member with ".." in its path would overwrite files outside
+    the destination folder, including the application's own executable."""
+    malicious = _wheel(
         {
             "yt_dlp/__init__.py": "",
-            "../../../evil.py": "print('invasao')",
+            "../../../evil.py": "print('pwned')",
         }
     )
-    _fingir_download(monkeypatch, malicioso)
+    _fake_download(monkeypatch, malicious)
 
-    with pytest.raises(RuntimeError, match="caminhos inválidos"):
-        updater.install("2030.1.1", "https://exemplo/pacote.whl", "")
+    with pytest.raises(RuntimeError, match="invalid paths"):
+        updater.install("2030.1.1", "https://example/package.whl", "")
 
     assert not (tmp_path.parent / "evil.py").exists()
 
 
-def test_recusa_pacote_sem_o_ytdlp_dentro(monkeypatch: pytest.MonkeyPatch) -> None:
-    _fingir_download(monkeypatch, _wheel({"outra_coisa/__init__.py": ""}))
+def test_rejects_a_package_without_yt_dlp_inside(monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake_download(monkeypatch, _wheel({"something_else/__init__.py": ""}))
 
-    with pytest.raises(RuntimeError, match="não contém o yt-dlp"):
-        updater.install("2030.1.1", "https://exemplo/pacote.whl", "")
-
-
-def test_recusa_pacote_grande_demais(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Um servidor comprometido não deve conseguir encher o disco do usuário."""
-    _fingir_download(monkeypatch, b"x" * (updater.MAX_WHEEL_BYTES + 1024))
-
-    with pytest.raises(RuntimeError, match="maior que o esperado"):
-        updater.install("2030.1.1", "https://exemplo/pacote.whl", "")
+    with pytest.raises(RuntimeError, match="does not contain yt-dlp"):
+        updater.install("2030.1.1", "https://example/package.whl", "")
 
 
-def test_instalacao_falha_nao_deixa_restos(
-    monkeypatch: pytest.MonkeyPatch, pasta_isolada: Path
+def test_rejects_an_oversized_package(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A compromised server must not be able to fill the user's disk."""
+    _fake_download(monkeypatch, b"x" * (updater.MAX_WHEEL_BYTES + 1024))
+
+    with pytest.raises(RuntimeError, match="larger than expected"):
+        updater.install("2030.1.1", "https://example/package.whl", "")
+
+
+def test_a_failed_install_leaves_nothing_behind(
+    monkeypatch: pytest.MonkeyPatch, isolated_folder: Path
 ) -> None:
-    _fingir_download(monkeypatch, _wheel({"nada/__init__.py": ""}))
+    _fake_download(monkeypatch, _wheel({"nothing/__init__.py": ""}))
 
     with pytest.raises(RuntimeError):
-        updater.install("2030.1.1", "https://exemplo/pacote.whl", "")
+        updater.install("2030.1.1", "https://example/package.whl", "")
 
-    assert list(pasta_isolada.iterdir()) == []
-
-
-# ── Ativação ─────────────────────────────────────────────────────────────
+    assert list(isolated_folder.iterdir()) == []
 
 
-def test_sem_nada_instalado_usa_a_versao_embutida() -> None:
+# ── Activation ───────────────────────────────────────────────────────────
+
+
+def test_with_nothing_installed_the_bundled_copy_is_used() -> None:
     assert updater.activate() is None
 
 
-def test_nao_troca_o_motor_com_o_ytdlp_ja_importado(
-    monkeypatch: pytest.MonkeyPatch, pasta_isolada: Path
+def test_does_not_swap_the_engine_once_yt_dlp_is_imported(
+    monkeypatch: pytest.MonkeyPatch, isolated_folder: Path
 ) -> None:
-    """Trocar o sys.path depois do import não teria efeito e daria a falsa
-    impressão de que a atualização entrou em uso."""
+    """Changing sys.path after the import would have no effect and would
+    falsely suggest the update is in use."""
     import sys
 
-    (pasta_isolada / "yt_dlp-2030.1.1" / "yt_dlp").mkdir(parents=True)
-    (pasta_isolada / "yt_dlp-2030.1.1" / "yt_dlp" / "__init__.py").write_text("")
+    (isolated_folder / "yt_dlp-2030.1.1" / "yt_dlp").mkdir(parents=True)
+    (isolated_folder / "yt_dlp-2030.1.1" / "yt_dlp" / "__init__.py").write_text("")
 
     monkeypatch.setitem(sys.modules, "yt_dlp", object())
     assert updater.activate() is None
 
 
-def test_escolhe_sempre_a_versao_mais_nova(
-    monkeypatch: pytest.MonkeyPatch, pasta_isolada: Path
+def test_always_picks_the_newest_version(
+    monkeypatch: pytest.MonkeyPatch, isolated_folder: Path
 ) -> None:
     import sys
 
-    for versao in ("2026.1.1", "2026.10.1", "2026.9.1"):
-        pasta = pasta_isolada / f"yt_dlp-{versao}" / "yt_dlp"
-        pasta.mkdir(parents=True)
-        (pasta / "__init__.py").write_text("")
+    for version in ("2026.1.1", "2026.10.1", "2026.9.1"):
+        folder = isolated_folder / f"yt_dlp-{version}" / "yt_dlp"
+        folder.mkdir(parents=True)
+        (folder / "__init__.py").write_text("")
 
     monkeypatch.delitem(sys.modules, "yt_dlp", raising=False)
-    caminho_original = list(sys.path)
+    original_path = list(sys.path)
     try:
         assert updater.activate() == "2026.10.1"
-        assert str(pasta_isolada / "yt_dlp-2026.10.1") == sys.path[0]
+        assert str(isolated_folder / "yt_dlp-2026.10.1") == sys.path[0]
     finally:
-        sys.path[:] = caminho_original
+        sys.path[:] = original_path
 
 
-def test_ignora_pasta_sem_o_pacote_dentro(
-    monkeypatch: pytest.MonkeyPatch, pasta_isolada: Path
+def test_ignores_a_folder_without_the_package_inside(
+    monkeypatch: pytest.MonkeyPatch, isolated_folder: Path
 ) -> None:
-    """Uma instalação interrompida deixa a pasta pela metade; ela não pode ser
-    escolhida no lugar da versão embutida, que funciona."""
+    """An interrupted install leaves a half-written folder; it must not be
+    picked over the bundled copy, which works."""
     import sys
 
-    (pasta_isolada / "yt_dlp-2030.1.1").mkdir()  # sem o subdiretório yt_dlp
+    (isolated_folder / "yt_dlp-2030.1.1").mkdir()  # without the yt_dlp subfolder
     monkeypatch.delitem(sys.modules, "yt_dlp", raising=False)
 
-    caminho_original = list(sys.path)
+    original_path = list(sys.path)
     try:
         assert updater.activate() is None
     finally:
-        sys.path[:] = caminho_original
+        sys.path[:] = original_path
 
 
-# ── Consulta ao repositório ──────────────────────────────────────────────
+# ── Querying the package index ───────────────────────────────────────────
 
 
-def test_versao_disponivel_compara_com_a_em_uso(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_available_version_is_compared_with_the_current_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(updater, "current_version", lambda: "2026.1.1")
     monkeypatch.setattr(
-        updater, "latest_version", lambda: ("2026.7.4", "https://exemplo/p.whl", "abc")
+        updater, "latest_version", lambda: ("2026.7.4", "https://example/p.whl", "abc")
     )
     assert updater.update_available() == "2026.7.4"
 
@@ -225,25 +227,23 @@ def test_versao_disponivel_compara_com_a_em_uso(monkeypatch: pytest.MonkeyPatch)
     assert updater.update_available() is None
 
 
-def test_repositorio_inacessivel_nao_derruba_o_aplicativo(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_an_unreachable_index_does_not_break_the_app(monkeypatch: pytest.MonkeyPatch) -> None:
     import requests
 
     def explode(*a, **k):
-        raise requests.ConnectionError("sem rede")
+        raise requests.ConnectionError("offline")
 
     monkeypatch.setattr(requests, "get", explode)
     assert updater.latest_version() is None
     assert updater.update_available() is None
 
 
-def test_recusa_versao_com_formato_estranho(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Só aceitamos versões numéricas; qualquer outra coisa vinda da API é
-    tratada como resposta inválida."""
+def test_rejects_a_strangely_formatted_version(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only numeric versions are accepted; anything else coming back from the
+    API is treated as an invalid response."""
     import requests
 
-    class Resposta:
+    class Response:
         def raise_for_status(self) -> None:
             pass
 
@@ -251,9 +251,13 @@ def test_recusa_versao_com_formato_estranho(monkeypatch: pytest.MonkeyPatch) -> 
             return {
                 "info": {"version": "1.0.0-beta; rm -rf /"},
                 "urls": [
-                    {"packagetype": "bdist_wheel", "filename": "x-py3-none-any.whl", "url": "u"}
+                    {
+                        "packagetype": "bdist_wheel",
+                        "filename": "x-py3-none-any.whl",
+                        "url": "u",
+                    }
                 ],
             }
 
-    monkeypatch.setattr(requests, "get", lambda *a, **k: Resposta())
+    monkeypatch.setattr(requests, "get", lambda *a, **k: Response())
     assert updater.latest_version() is None

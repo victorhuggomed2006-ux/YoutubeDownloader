@@ -1,4 +1,4 @@
-"""Componentes visuais reutilizáveis."""
+"""Reusable visual components."""
 
 from .history_view import HistoryView
 from .preview_card import PreviewCard

@@ -1,4 +1,4 @@
-"""Tabela com o histórico de downloads."""
+"""The download history table."""
 
 from __future__ import annotations
 
@@ -22,17 +22,9 @@ from ...core.history import HistoryStore
 from ...core.models import HistoryEntry
 from ...core.urls import format_size
 
-COLUMNS = ("Quando", "Título", "Tipo", "Qualidade", "Tamanho", "Situação")
-
-STATUS_LABELS = {
-    "completed": "Concluído",
-    "failed": "Falhou",
-    "cancelled": "Cancelado",
-}
-
 
 class HistoryView(QWidget):
-    """Lista os downloads anteriores e permite abrir os arquivos."""
+    """Lists past downloads and lets the user open the files."""
 
     open_file_requested = Signal(str)
 
@@ -50,20 +42,29 @@ class HistoryView(QWidget):
         header.addWidget(self._summary)
         header.addStretch(1)
 
-        self._open_button = QPushButton(self.tr("Abrir arquivo"))
+        self._open_button = QPushButton(self.tr("Open file"))
         self._open_button.setObjectName("GhostButton")
         self._open_button.setEnabled(False)
         self._open_button.clicked.connect(self._emit_open_selected)
         header.addWidget(self._open_button)
 
-        self._clear_button = QPushButton(self.tr("Limpar histórico"))
+        self._clear_button = QPushButton(self.tr("Clear history"))
         self._clear_button.setObjectName("DangerButton")
         self._clear_button.clicked.connect(self._clear)
         header.addWidget(self._clear_button)
         layout.addLayout(header)
 
-        self._table = QTableWidget(0, len(COLUMNS))
-        self._table.setHorizontalHeaderLabels(COLUMNS)
+        self._columns = (
+            self.tr("When"),
+            self.tr("Title"),
+            self.tr("Kind"),
+            self.tr("Quality"),
+            self.tr("Size"),
+            self.tr("Status"),
+        )
+
+        self._table = QTableWidget(0, len(self._columns))
+        self._table.setHorizontalHeaderLabels(self._columns)
         self._table.verticalHeader().setVisible(False)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -77,19 +78,26 @@ class HistoryView(QWidget):
         header_view = self._table.horizontalHeader()
         header_view.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        for column in range(2, len(COLUMNS)):
+        for column in range(2, len(self._columns)):
             header_view.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
 
         layout.addWidget(self._table, 1)
 
-        self._empty = QLabel(self.tr("Nenhum download registrado ainda."))
+        self._empty = QLabel(self.tr("No downloads recorded yet."))
         self._empty.setObjectName("EmptyState")
         self._empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._empty)
 
         self.refresh()
 
-    # ── Dados ────────────────────────────────────────────────────────────
+    def _status_label(self, status: str) -> str:
+        return {
+            "completed": self.tr("Done"),
+            "failed": self.tr("Failed"),
+            "cancelled": self.tr("Cancelled"),
+        }.get(status, status)
+
+    # ── Data ─────────────────────────────────────────────────────────────
 
     def refresh(self) -> None:
         entries = self._store.entries()
@@ -103,7 +111,7 @@ class HistoryView(QWidget):
             title_item.setData(Qt.ItemDataRole.UserRole, entry.file_path)
             self._table.setItem(row, 1, title_item)
 
-            kind = "Áudio" if entry.kind == "audio" else "Vídeo"
+            kind = self.tr("Audio") if entry.kind == "audio" else self.tr("Video")
             self._table.setItem(row, 2, self._make_item(kind))
 
             quality = f"{entry.quality} kbps" if entry.kind == "audio" else entry.quality
@@ -111,7 +119,7 @@ class HistoryView(QWidget):
 
             self._table.setItem(row, 4, self._make_item(format_size(entry.size_bytes)))
 
-            status_item = self._make_item(STATUS_LABELS.get(entry.status, entry.status))
+            status_item = self._make_item(self._status_label(entry.status))
             if entry.error:
                 status_item.setToolTip(entry.error)
             self._table.setItem(row, 5, status_item)
@@ -120,7 +128,9 @@ class HistoryView(QWidget):
         self._table.setVisible(has_entries)
         self._empty.setVisible(not has_entries)
         self._clear_button.setEnabled(has_entries)
-        self._summary.setText(f"{len(entries)} registro(s)" if has_entries else "Histórico vazio")
+        self._summary.setText(
+            self.tr("%n download(s)", "", len(entries)) if has_entries else self.tr("History empty")
+        )
         self._on_selection_changed()
 
     @staticmethod
@@ -129,7 +139,7 @@ class HistoryView(QWidget):
         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         return item
 
-    # ── Ações ────────────────────────────────────────────────────────────
+    # ── Actions ──────────────────────────────────────────────────────────
 
     def _selected_path(self) -> str:
         rows = self._table.selectionModel().selectedRows() if self._table.selectionModel() else []
@@ -159,7 +169,7 @@ class HistoryView(QWidget):
 
 
 def _format_timestamp(raw: str) -> str:
-    """Converte o carimbo ISO em UTC para a hora local, em formato curto."""
+    """Convert the stored UTC timestamp to local time, in a short format."""
     if not raw:
         return "--"
     try:

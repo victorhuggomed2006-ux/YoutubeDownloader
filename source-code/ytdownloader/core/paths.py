@@ -1,7 +1,7 @@
-"""Descoberta dos diretórios usados pelo aplicativo.
+"""Discovery of the directories the application uses.
 
-Funciona tanto rodando a partir do código-fonte quanto dentro do executável
-gerado pelo PyInstaller, onde os recursos ficam em ``sys._MEIPASS``.
+Works both when running from source and inside the PyInstaller executable,
+where resources live under ``sys._MEIPASS``.
 """
 
 from __future__ import annotations
@@ -14,15 +14,16 @@ APP_DIR_NAME = "YouTubeDownloader"
 
 
 def is_frozen() -> bool:
-    """Retorna True quando o código está rodando dentro do executável."""
+    """True when the code is running inside the packaged executable."""
     return getattr(sys, "frozen", False)
 
 
 def bundle_dir() -> Path:
-    """Diretório onde ficam os recursos empacotados.
+    """Where the bundled resources live.
 
-    No executável é a pasta temporária de extração (``sys._MEIPASS``); no
-    código-fonte é a raiz do pacote ``ytdownloader``.
+    In the executable this is the temporary extraction folder
+    (``sys._MEIPASS``); from source it is the root of the ``ytdownloader``
+    package.
     """
     meipass = getattr(sys, "_MEIPASS", None)
     if meipass:
@@ -31,19 +32,23 @@ def bundle_dir() -> Path:
 
 
 def install_dir() -> Path:
-    """Pasta onde o aplicativo está instalado (onde vive o .exe)."""
+    """The folder the application is installed in (where the .exe lives).
+
+    Running from source there is no install folder, so the project root stands
+    in for it — that is where the development binaries sit.
+    """
     if is_frozen():
         return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parents[3]
+    return Path(__file__).resolve().parents[2]
 
 
 def resource_path(*parts: str) -> Path:
-    """Caminho de um arquivo dentro de ``ytdownloader/resources``."""
+    """Path to a file inside ``ytdownloader/resources``."""
     return bundle_dir().joinpath("resources", *parts)
 
 
 def app_data_dir() -> Path:
-    """Pasta de dados do usuário (configurações, histórico, logs)."""
+    """The user's data folder: settings, history and logs."""
     base = os.getenv("APPDATA")
     if base:
         path = Path(base) / APP_DIR_NAME
@@ -58,15 +63,23 @@ def app_data_dir() -> Path:
 
 
 def runtime_dir() -> Path:
-    """Pasta onde versões atualizadas do yt-dlp são instaladas."""
+    """Where updated yt-dlp versions are installed."""
     path = app_data_dir() / "runtime"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def default_download_dir() -> Path:
-    """Pasta de destino padrão dos downloads."""
-    candidates = [Path.home() / "Downloads", Path.home() / "Transferências"]
+    """The default destination for downloads.
+
+    Windows localises the Downloads folder, so the common translations are
+    checked before falling back to the home directory.
+    """
+    candidates = [
+        Path.home() / "Downloads",
+        Path.home() / "Transferências",  # pt-BR
+        Path.home() / "Descargas",  # es
+    ]
     for candidate in candidates:
         if candidate.is_dir():
             return candidate / "YouTube Downloader"

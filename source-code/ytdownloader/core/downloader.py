@@ -1,7 +1,7 @@
-"""Camada sobre o yt-dlp: consulta de metadados e execução dos downloads.
+"""The layer over yt-dlp: metadata lookups and running downloads.
 
-Este módulo não conhece Qt. A interface conversa com ele por callbacks, o que
-mantém o núcleo testável e reaproveitável.
+This module knows nothing about Qt. The interface talks to it through
+callbacks, which keeps the core testable and reusable.
 """
 
 from __future__ import annotations
@@ -31,12 +31,15 @@ logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[Progress], None]
 
-#: Quantidade de fragmentos baixados em paralelo por download.
+#: How many fragments are fetched in parallel per download.
 CONCURRENT_FRAGMENTS = 4
+
+#: Value that means "do not import cookies from any browser".
+NO_BROWSER = "none"
 
 
 class _YdlLogger:
-    """Redireciona as mensagens do yt-dlp para o logging do aplicativo."""
+    """Routes yt-dlp's own messages into the application log."""
 
     def __init__(self) -> None:
         self.last_error: str = ""
@@ -58,12 +61,12 @@ class _YdlLogger:
 
 
 class Downloader:
-    """Executa consultas e downloads usando o yt-dlp."""
+    """Runs lookups and downloads through yt-dlp."""
 
-    def __init__(self, cookies_from_browser: str = "nenhum") -> None:
+    def __init__(self, cookies_from_browser: str = NO_BROWSER) -> None:
         self.cookies_from_browser = cookies_from_browser
 
-    # ── Opções ───────────────────────────────────────────────────────────
+    # ── Options ──────────────────────────────────────────────────────────
 
     def _base_options(self) -> dict:
         options: dict = {
@@ -78,7 +81,7 @@ class Downloader:
             "extractor_retries": 3,
             "skip_unavailable_fragments": True,
             "windowsfilenames": True,
-            # Aplicado apenas ao nome do arquivo, já que o diretório vai em "paths".
+            # Applies to the file name alone, since the directory goes in "paths".
             "trim_file_name": 120,
             "logger": _YdlLogger(),
         }
@@ -87,9 +90,9 @@ class Downloader:
         if runtimes:
             options["js_runtimes"] = runtimes
 
-        browser = (self.cookies_from_browser or "nenhum").strip().lower()
-        if browser and browser != "nenhum":
-            # O yt-dlp espera uma tupla (navegador, perfil, keyring, container).
+        browser = (self.cookies_from_browser or NO_BROWSER).strip().lower()
+        if browser and browser != NO_BROWSER:
+            # yt-dlp expects a (browser, profile, keyring, container) tuple.
             options["cookiesfrombrowser"] = (browser,)
 
         location = ffmpeg_module.ffmpeg_location()
@@ -110,8 +113,9 @@ class Downloader:
         output_dir = Path(request.output_dir)
         options.update(
             {
-                # O modelo precisa ser relativo: o diretório vem de "paths", e é
-                # isso que faz o corte de nome longo agir só sobre o nome.
+                # The template must be relative: the directory comes from
+                # "paths", and that is what makes the long-name trim apply to
+                # the file name instead of chopping the directory too.
                 "outtmpl": "%(title)s.%(ext)s",
                 "paths": {"home": str(output_dir)},
                 "progress_hooks": [progress_hook],
@@ -162,13 +166,13 @@ class Downloader:
 
         return options
 
-    # ── Consultas ────────────────────────────────────────────────────────
+    # ── Lookups ──────────────────────────────────────────────────────────
 
     def fetch_info(self, url: str) -> VideoInfo:
-        """Obtém os metadados de um único vídeo."""
+        """Fetch the metadata of a single video."""
         parsed = parse_url(url)
         if not parsed.is_supported:
-            raise DownloaderError("Este endereço não é um link de vídeo válido.")
+            raise DownloaderError("This address is not a valid video link.")
 
         target = parsed.canonical
         options = self._base_options()
@@ -183,25 +187,25 @@ class Downloader:
             raise humanize(exc) from exc
 
         if raw is None:
-            raise DownloaderError("Não foi possível ler as informações do vídeo.")
+            raise DownloaderError("Could not read the video details.")
 
         if raw.get("_type") == "playlist":
             entries = [e for e in (raw.get("entries") or []) if e]
             if not entries:
-                raise DownloaderError("Esta playlist está vazia ou é privada.")
+                raise DownloaderError("This playlist is empty or private.")
             raw = entries[0]
 
         return VideoInfo.from_ydl(raw)
 
     def fetch_playlist(self, url: str, limit: int = 200) -> list[VideoInfo]:
-        """Lista os vídeos de uma playlist ou coleção, sem baixar nada.
+        """List the videos in a playlist or collection, downloading nothing.
 
-        Fora do YouTube não dá para saber pelo endereço se ele aponta para uma
-        coleção; quem decide é o próprio yt-dlp ao extrair.
+        Outside YouTube there is no way to tell from the address alone whether
+        it points at a collection; yt-dlp decides that while extracting.
         """
         parsed = parse_url(url)
         if not parsed.is_supported:
-            raise DownloaderError("Este endereço não é um link válido.")
+            raise DownloaderError("This address is not a valid link.")
 
         options = self._base_options()
         options.update(
@@ -220,10 +224,10 @@ class Downloader:
             raise humanize(exc) from exc
 
         if not raw:
-            raise DownloaderError("Não foi possível ler a lista de vídeos.")
+            raise DownloaderError("Could not read the video list.")
 
         if raw.get("_type") != "playlist":
-            raise DownloaderError("Este endereço aponta para um vídeo único, não uma lista.")
+            raise DownloaderError("This address points to a single video, not a list.")
 
         videos: list[VideoInfo] = []
         for entry in raw.get("entries") or []:
@@ -237,7 +241,7 @@ class Downloader:
             videos.append(info)
 
         if not videos:
-            raise DownloaderError("Esta playlist está vazia ou é privada.")
+            raise DownloaderError("This playlist is empty or private.")
         return videos
 
     # ── Download ─────────────────────────────────────────────────────────
@@ -248,12 +252,14 @@ class Downloader:
         on_progress: ProgressCallback | None = None,
         cancel_event: threading.Event | None = None,
     ) -> Path:
-        """Baixa o vídeo ou áudio pedido e devolve o caminho do arquivo final.
+        """Download what was requested and return the final file path.
 
-        ``cancel_event`` permite interromper o download entre fragmentos.
+        ``cancel_event`` interrupts the download between fragments.
         """
         request = request.normalized()
 
+        # Merging video with audio needs FFmpeg. Better to say so now than to
+        # download hundreds of megabytes and fail at the end.
         if needs_ffmpeg(request.kind, request.container) and not ffmpeg_module.is_available():
             raise FFmpegMissingError()
 
@@ -295,7 +301,7 @@ class Downloader:
                         downloaded_bytes=int(data.get("downloaded_bytes") or 0),
                         total_bytes=data.get("total_bytes"),
                         status=TaskStatus.CONVERTING,
-                        detail="Finalizando arquivo...",
+                        detail="Finishing the file...",
                     )
                 )
 
@@ -305,20 +311,20 @@ class Downloader:
                 return
             name = str(data.get("postprocessor") or "")
             detail = {
-                "FFmpegExtractAudio": "Convertendo o áudio...",
-                "FFmpegMerger": "Juntando vídeo e áudio...",
-                "FFmpegVideoConvertor": "Convertendo o vídeo...",
-                "EmbedThumbnail": "Aplicando a capa...",
-                "FFmpegMetadata": "Gravando as informações...",
-                "FFmpegEmbedSubtitle": "Incorporando as legendas...",
-                "MoveFiles": "Salvando na pasta de destino...",
-            }.get(name, "Processando o arquivo...")
+                "FFmpegExtractAudio": "Converting the audio...",
+                "FFmpegMerger": "Merging video and audio...",
+                "FFmpegVideoConvertor": "Converting the video...",
+                "EmbedThumbnail": "Applying the cover art...",
+                "FFmpegMetadata": "Writing the metadata...",
+                "FFmpegEmbedSubtitle": "Embedding the subtitles...",
+                "MoveFiles": "Saving to the destination folder...",
+            }.get(name, "Processing the file...")
             report(Progress(percent=100.0, status=TaskStatus.CONVERTING, detail=detail))
 
         options = self._download_options(request, progress_hook, postprocessor_hook)
         ydl_logger = options["logger"]
 
-        report(Progress(status=TaskStatus.FETCHING, detail="Consultando o vídeo..."))
+        report(Progress(status=TaskStatus.FETCHING, detail="Looking up the video..."))
         check_cancelled()
 
         try:
@@ -332,11 +338,11 @@ class Downloader:
             raise humanize(exc) from exc
 
         if info is None:
-            raise DownloaderError("O download não produziu nenhum arquivo.")
+            raise DownloaderError("The download produced no file.")
 
         output_file = self._resolve_output_file(info, output_dir, request)
         if output_file is None:
-            raise DownloaderError("O arquivo baixado não foi encontrado no disco.")
+            raise DownloaderError("The downloaded file was not found on disk.")
 
         report(
             Progress(
@@ -344,16 +350,16 @@ class Downloader:
                 downloaded_bytes=output_file.stat().st_size,
                 total_bytes=output_file.stat().st_size,
                 status=TaskStatus.COMPLETED,
-                detail="Concluído",
+                detail="Done",
             )
         )
         return output_file
 
-    # ── Auxiliares ───────────────────────────────────────────────────────
+    # ── Helpers ──────────────────────────────────────────────────────────
 
     @staticmethod
     def _resolve_output_file(info: dict, output_dir: Path, request: DownloadRequest) -> Path | None:
-        """Descobre o caminho do arquivo final a partir do retorno do yt-dlp."""
+        """Work out the final file path from what yt-dlp returned."""
         candidates: list[str] = []
 
         for entry in info.get("requested_downloads") or []:
@@ -371,7 +377,7 @@ class Downloader:
             path = Path(candidate)
             if path.is_file():
                 return path
-            # Após a conversão a extensão muda, mas o nome base continua igual.
+            # Post-processing changes the extension, but the stem stays.
             converted = path.with_suffix(f".{request.container}")
             if converted.is_file():
                 return converted
@@ -382,7 +388,7 @@ class Downloader:
     def _newest_matching_file(
         output_dir: Path, request: DownloadRequest, candidates: Sequence[str]
     ) -> Path | None:
-        """Último recurso: procura na pasta o arquivo mais recente do tipo pedido."""
+        """Last resort: the newest file of the requested type in the folder."""
         if not output_dir.is_dir():
             return None
 

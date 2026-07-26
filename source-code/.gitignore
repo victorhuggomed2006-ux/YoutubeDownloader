@@ -12,13 +12,13 @@ __pycache__/
 coverage.xml
 htmlcov/
 
-# Ambientes virtuais
+# Virtual environments
 venv/
 .venv/
 env/
 ENV/
 
-# Empacotamento (PyInstaller / WiX)
+# Packaging (PyInstaller / WiX)
 build/
 dist/
 packaging/vendor/
@@ -26,16 +26,20 @@ packaging/version_info.txt
 *.wixpdb
 *.wixobj
 
-# O instalador publicado fica versionado na raiz do repositório, um nível acima
-# desta pasta, para ficar visível na listagem. Atenção: o GitHub recusa arquivos
-# acima de 100 MB, e cada versão adicionada permanece no histórico para sempre.
+# The published installer is versioned in the repository root, one level above
+# this folder, so it shows up in the listing. Note: GitHub rejects files over
+# 100 MB, and every version added stays in the history forever.
 
-# Dados locais gerados pelo app
+# Compiled translations — generated from the .ts files by
+# packaging/build_translations.ps1, which the build and CI both run.
+*.qm
+
+# Local data written by the app
 *.log
 settings.json
 history.json
 
-# Editores / SO
+# Editors / OS
 .vscode/
 .idea/
 *.swp

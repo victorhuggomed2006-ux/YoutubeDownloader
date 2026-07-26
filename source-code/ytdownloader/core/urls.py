@@ -1,9 +1,9 @@
-"""Validação e normalização das URLs aceitas pelo aplicativo.
+"""Validation and normalisation of the addresses the application accepts.
 
-O yt-dlp extrai vídeo de mais de mil sites, então a validação aceita qualquer
-endereço http/https. O YouTube continua recebendo tratamento especial — extração
-de identificador, detecção de playlist e miniatura previsível — porque é o caso
-de uso principal e permite mostrar a prévia antes mesmo de consultar a rede.
+yt-dlp extracts video from over a thousand sites, so validation accepts any
+http/https address. YouTube still gets dedicated handling — identifier
+extraction, playlist detection and a predictable thumbnail — because it is the
+common case and lets the preview show up before the network is even touched.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ YOUTUBE_HOSTS = {
     "www.youtube-nocookie.com",
 }
 
-#: Sites com nome conhecido, apenas para exibição na interface.
+#: Sites with a known name, for display purposes only.
 KNOWN_SITES = {
     "vimeo.com": "Vimeo",
     "twitch.tv": "Twitch",
@@ -43,11 +43,11 @@ KNOWN_SITES = {
     "globoplay.globo.com": "Globoplay",
 }
 
-# IDs de vídeo do YouTube têm exatamente 11 caracteres do alfabeto base64-url.
+# YouTube video IDs are exactly 11 characters from the base64-url alphabet.
 VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 PLAYLIST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{2,}$")
 
-# Caminhos do YouTube que carregam o identificador no próprio path.
+# YouTube paths that carry the identifier in the path itself.
 PATH_PREFIXES = ("/shorts/", "/embed/", "/live/", "/v/")
 
 SCHEME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
@@ -58,7 +58,7 @@ HOST_RE = re.compile(
 
 @dataclass(frozen=True)
 class ParsedUrl:
-    """Resultado da análise de um endereço colado pelo usuário."""
+    """The result of parsing an address the user pasted."""
 
     original: str
     host: str = ""
@@ -73,15 +73,15 @@ class ParsedUrl:
 
     @property
     def is_playlist(self) -> bool:
-        """Playlist a ser expandida: só quando não há um vídeo específico."""
+        """A playlist to expand: only when no specific video was given."""
         return self.playlist_id is not None and self.video_id is None
 
     @property
     def canonical(self) -> str:
-        """Endereço limpo, sem parâmetros de rastreamento.
+        """The address stripped of tracking parameters.
 
-        Fora do YouTube o endereço é devolvido como veio: cada site tem sua
-        própria convenção e reescrevê-lo por conta própria quebraria links.
+        Outside YouTube the address comes back as it went in: every site has
+        its own conventions, and rewriting it here would break links.
         """
         if self.video_id:
             return f"https://www.youtube.com/watch?v={self.video_id}"
@@ -91,14 +91,14 @@ class ParsedUrl:
 
     @property
     def thumbnail_url(self) -> str | None:
-        """Miniatura previsível do YouTube, exibida antes da consulta à rede."""
+        """YouTube's predictable thumbnail, shown before the network call."""
         if not self.video_id:
             return None
         return f"https://i.ytimg.com/vi/{self.video_id}/hqdefault.jpg"
 
     @property
     def site_name(self) -> str:
-        """Nome do site para exibição, ou o próprio domínio."""
+        """The site name for display, or the domain itself."""
         if self.is_youtube:
             return "YouTube"
         host = self.host.removeprefix("www.")
@@ -109,7 +109,7 @@ class ParsedUrl:
 
 
 def _with_scheme(url: str) -> str:
-    """Completa o esquema quando o usuário cola o endereço sem ele."""
+    """Fill in the scheme when the user pastes an address without one."""
     url = (url or "").strip()
     if not url:
         return ""
@@ -119,7 +119,7 @@ def _with_scheme(url: str) -> str:
 
 
 def parse_url(url: str) -> ParsedUrl:
-    """Analisa o endereço e extrai o que for possível."""
+    """Parse the address and extract whatever is available."""
     raw = (url or "").strip()
     cleaned = _with_scheme(raw)
     if not cleaned:
@@ -130,7 +130,7 @@ def parse_url(url: str) -> ParsedUrl:
     except ValueError:
         return ParsedUrl(original=raw)
 
-    # Apenas http e https: file://, javascript: e afins não têm o que fazer aqui.
+    # http and https only: file://, javascript: and friends have no business here.
     if parsed.scheme not in ("http", "https"):
         return ParsedUrl(original=raw)
 
@@ -140,7 +140,7 @@ def parse_url(url: str) -> ParsedUrl:
 
     is_youtube = host in YOUTUBE_HOSTS
     if not is_youtube:
-        # Qualquer outro site fica a cargo do yt-dlp, que sabe quais suporta.
+        # Any other site is left to yt-dlp, which knows what it supports.
         return ParsedUrl(original=raw, host=host, is_supported=True)
 
     query = parse_qs(parsed.query)
@@ -149,7 +149,7 @@ def parse_url(url: str) -> ParsedUrl:
     video_id = _extract_video_id(host, path, query)
     playlist_id = _extract_playlist_id(query)
 
-    # O endereço do YouTube só serve se apontar para um vídeo ou uma playlist.
+    # A YouTube address is only useful if it points at a video or a playlist.
     supported = bool(video_id or playlist_id)
 
     return ParsedUrl(
@@ -186,19 +186,19 @@ def _extract_playlist_id(query: dict[str, list[str]]) -> str | None:
     values = query.get("list") or []
     if not values or not PLAYLIST_ID_RE.match(values[0]):
         return None
-    # "RD..." são mixes infinitos gerados pelo YouTube, não playlists reais.
+    # "RD..." are endless mixes generated by YouTube, not real playlists.
     if values[0].startswith("RD"):
         return None
     return values[0]
 
 
 def is_supported_url(url: str) -> bool:
-    """Atalho booleano usado na validação enquanto o usuário digita."""
+    """Boolean shortcut used while the user is typing."""
     return parse_url(url).is_supported
 
 
 def format_duration(seconds: float | int | None) -> str:
-    """Formata uma duração em segundos como ``mm:ss`` ou ``h:mm:ss``."""
+    """Format a duration in seconds as ``mm:ss`` or ``h:mm:ss``."""
     if not seconds or seconds < 0:
         return "--:--"
     total = int(seconds)
@@ -210,7 +210,7 @@ def format_duration(seconds: float | int | None) -> str:
 
 
 def format_size(num_bytes: float | int | None) -> str:
-    """Formata um tamanho em bytes de forma legível."""
+    """Format a size in bytes in a readable way."""
     if not num_bytes or num_bytes <= 0:
         return "--"
     size = float(num_bytes)

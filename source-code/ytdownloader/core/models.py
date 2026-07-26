@@ -1,4 +1,4 @@
-"""Estruturas de dados compartilhadas entre o núcleo e a interface."""
+"""Data structures shared between the core and the interface."""
 
 from __future__ import annotations
 
@@ -15,6 +15,8 @@ from .formats import (
     DEFAULT_VIDEO_QUALITY,
     MediaKind,
 )
+
+UNTITLED = "Untitled"
 
 
 class TaskStatus(str, Enum):
@@ -33,22 +35,22 @@ class TaskStatus(str, Enum):
     @property
     def label(self) -> str:
         return {
-            TaskStatus.QUEUED: "Na fila",
-            TaskStatus.FETCHING: "Consultando",
-            TaskStatus.DOWNLOADING: "Baixando",
-            TaskStatus.CONVERTING: "Convertendo",
-            TaskStatus.COMPLETED: "Concluído",
-            TaskStatus.FAILED: "Falhou",
-            TaskStatus.CANCELLED: "Cancelado",
+            TaskStatus.QUEUED: "Queued",
+            TaskStatus.FETCHING: "Looking up",
+            TaskStatus.DOWNLOADING: "Downloading",
+            TaskStatus.CONVERTING: "Converting",
+            TaskStatus.COMPLETED: "Done",
+            TaskStatus.FAILED: "Failed",
+            TaskStatus.CANCELLED: "Cancelled",
         }[self]
 
 
 @dataclass
 class VideoInfo:
-    """Metadados de um vídeo, obtidos antes do download."""
+    """Video metadata, fetched before the download starts."""
 
     video_id: str = ""
-    title: str = "Sem título"
+    title: str = UNTITLED
     uploader: str = ""
     duration: float = 0.0
     thumbnail: str = ""
@@ -59,10 +61,10 @@ class VideoInfo:
 
     @classmethod
     def from_ydl(cls, info: dict) -> VideoInfo:
-        """Constrói a partir do dicionário devolvido pelo yt-dlp."""
+        """Build from the dictionary yt-dlp returns."""
         return cls(
             video_id=info.get("id") or "",
-            title=info.get("title") or "Sem título",
+            title=info.get("title") or UNTITLED,
             uploader=info.get("uploader") or info.get("channel") or "",
             duration=float(info.get("duration") or 0),
             thumbnail=info.get("thumbnail") or "",
@@ -75,7 +77,7 @@ class VideoInfo:
 
 @dataclass
 class DownloadRequest:
-    """O que o usuário pediu para baixar."""
+    """What the user asked to download."""
 
     url: str
     kind: MediaKind = MediaKind.VIDEO
@@ -85,10 +87,14 @@ class DownloadRequest:
     embed_thumbnail: bool = True
     embed_metadata: bool = True
     write_subtitles: bool = False
-    subtitle_languages: tuple[str, ...] = ("pt", "pt-BR", "en")
+    subtitle_languages: tuple[str, ...] = ("en", "pt", "pt-BR", "es")
 
     def normalized(self) -> DownloadRequest:
-        """Garante que qualidade e container combinem com o tipo de mídia."""
+        """Make sure quality and container match the media kind.
+
+        Switching between video and audio would otherwise leave "1080p" as a
+        bitrate, or "mp4" as an audio container.
+        """
         if self.kind is MediaKind.AUDIO:
             quality = self.quality if self.quality.isdigit() else DEFAULT_AUDIO_QUALITY
             container = (
@@ -118,7 +124,7 @@ class DownloadRequest:
 
 @dataclass
 class Progress:
-    """Instantâneo do andamento de um download."""
+    """A snapshot of how a download is going."""
 
     percent: float = 0.0
     downloaded_bytes: int = 0
@@ -131,7 +137,7 @@ class Progress:
 
 @dataclass
 class DownloadTask:
-    """Um item da fila de downloads."""
+    """One entry in the download queue."""
 
     request: DownloadRequest
     task_id: str = field(default_factory=lambda: uuid.uuid4().hex)
@@ -152,7 +158,7 @@ class DownloadTask:
 
 @dataclass
 class HistoryEntry:
-    """Registro persistido de um download já finalizado."""
+    """A stored record of a finished download."""
 
     title: str
     url: str
@@ -184,7 +190,7 @@ class HistoryEntry:
     @classmethod
     def from_dict(cls, data: dict) -> HistoryEntry:
         return cls(
-            title=data.get("title") or "Sem título",
+            title=data.get("title") or UNTITLED,
             url=data.get("url") or "",
             kind=data.get("kind") or "video",
             quality=data.get("quality") or "",

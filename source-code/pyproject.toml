@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ytdownloader"
 version = "1.0.0"
-description = "Aplicativo desktop para baixar vídeos e áudios do YouTube"
+description = "Desktop app for downloading video and audio"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -56,7 +56,7 @@ addopts = "-q"
 
 [tool.coverage.run]
 source = ["ytdownloader"]
-# A interface é exercitada manualmente; medi-la aqui daria um número enganoso.
+# The interface is exercised by hand; measuring it here would be misleading.
 omit = ["*/gui/*", "*/__main__.py"]
 
 [tool.coverage.report]
@@ -78,24 +78,24 @@ select = [
     "I",    # isort
     "UP",   # pyupgrade
     "B",    # bugbear
-    "SIM",  # simplificações
-    "RUF",  # regras do próprio ruff
+    "SIM",  # simplifications
+    "RUF",  # ruff's own rules
     "PTH",  # prefira pathlib
-    "S",    # bandit: segurança
+    "S",    # bandit: security
 ]
 ignore = [
-    "E501",    # o formatador já cuida do comprimento das linhas
-    "S101",    # assert é a forma natural de escrever teste
-    "B008",    # chamada em argumento padrão: comum e intencional no Qt
-    "RUF001",  # acentuação e travessão em texto voltado ao usuário
+    "E501",    # the formatter already handles line length
+    "S101",    # assert is the natural way to write a test
+    "B008",    # call in a default argument: common and intentional with Qt
+    "RUF001",  # accents and em dashes in user-facing text
     "RUF002",
     "RUF003",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Nos testes, subprocessos e caminhos temporários são o próprio objeto do teste.
+# In tests, subprocesses and temporary paths are the subject under test.
 "tests/*" = ["S105", "S106", "S108", "S603", "S607"]
-# Scripts de empacotamento rodam só na máquina de quem compila.
+# Packaging scripts only run on the machine doing the build.
 "packaging/*" = ["S603", "S607", "T201"]
 
 [tool.ruff.format]

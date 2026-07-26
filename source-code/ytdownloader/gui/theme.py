@@ -1,4 +1,4 @@
-"""Temas claro e escuro aplicados via folha de estilo do Qt."""
+"""Light and dark themes, applied through a Qt style sheet."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Palette:
-    """Cores de um tema."""
+    """The colours of one theme."""
 
     window: str
     surface: str
@@ -73,8 +73,8 @@ def palette_for(name: str) -> Palette:
 
 
 def _arrow_url(theme: str) -> str:
-    """Caminho da seta dos seletores, no formato aceito pela folha de estilo."""
-    from ..core import paths  # importado aqui para o tema não depender do núcleo
+    """Path to the combo box arrow, in the form the style sheet accepts."""
+    from ..core import paths  # imported here so the theme does not depend on the core
 
     filename = "arrow-light.png" if theme == "light" else "arrow-dark.png"
     path = paths.resource_path(filename)
@@ -84,7 +84,7 @@ def _arrow_url(theme: str) -> str:
 
 
 def build_stylesheet(name: str) -> str:
-    """Gera a folha de estilo completa para o tema pedido."""
+    """Build the full style sheet for the requested theme."""
     c = palette_for(name)
     arrow = _arrow_url(name)
     arrow_rule = f"image: url({arrow});" if arrow else "image: none;"
@@ -100,7 +100,7 @@ QMainWindow, QDialog {{
     background-color: {c.window};
 }}
 
-/* Rótulos e caixas herdam o fundo do cartão em que estão, e não o da janela. */
+/* Labels and boxes inherit the card background, not the window one. */
 QLabel, QCheckBox, QGroupBox, QRadioButton {{
     background: transparent;
 }}
@@ -117,7 +117,7 @@ QToolTip {{
     border-radius: 6px;
 }}
 
-/* ── Cartões ─────────────────────────────────────────────── */
+/* ── Cards ───────────────────────────────────────────────── */
 QFrame#Card {{
     background-color: {c.surface};
     border: 1px solid {c.border};
@@ -142,7 +142,7 @@ QFrame#Separator {{
     max-height: 1px;
 }}
 
-/* ── Tipografia ──────────────────────────────────────────── */
+/* ── Typography ──────────────────────────────────────────── */
 QLabel#AppTitle {{
     font-size: 19px;
     font-weight: 700;
@@ -202,7 +202,7 @@ QLabel#Thumb {{
     border-radius: 8px;
 }}
 
-/* ── Campo de texto ──────────────────────────────────────── */
+/* ── Text field ──────────────────────────────────────────── */
 QLineEdit {{
     background-color: {c.surface_alt};
     border: 1px solid {c.border};
@@ -230,7 +230,7 @@ QLineEdit[state="invalid"] {{
     border-color: {c.danger};
 }}
 
-/* ── Botões ──────────────────────────────────────────────── */
+/* ── Buttons ─────────────────────────────────────────────── */
 QPushButton {{
     background-color: {c.surface_alt};
     border: 1px solid {c.border};
@@ -314,7 +314,7 @@ QPushButton#DangerButton:hover {{
     border-color: {c.danger};
 }}
 
-/* ── Seletores ───────────────────────────────────────────── */
+/* ── Combo boxes ─────────────────────────────────────────── */
 QComboBox {{
     background-color: {c.surface_alt};
     border: 1px solid {c.border};
@@ -354,7 +354,7 @@ QComboBox QAbstractItemView {{
     selection-color: {c.accent_text};
 }}
 
-/* ── Alternador de formato ───────────────────────────────── */
+/* ── Format toggle ───────────────────────────────────────── */
 QPushButton#SegmentLeft, QPushButton#SegmentRight {{
     background-color: {c.surface_alt};
     border: 1px solid {c.border};
@@ -385,7 +385,7 @@ QPushButton#SegmentLeft:hover:!checked, QPushButton#SegmentRight:hover:!checked 
     color: {c.text};
 }}
 
-/* ── Barra de progresso ──────────────────────────────────── */
+/* ── Progress bar ────────────────────────────────────────── */
 QProgressBar {{
     background-color: {c.track};
     border: none;
@@ -408,7 +408,7 @@ QProgressBar[state="error"]::chunk {{
     background-color: {c.danger};
 }}
 
-/* ── Abas ────────────────────────────────────────────────── */
+/* ── Tabs ────────────────────────────────────────────────── */
 QTabWidget::pane {{
     border: none;
     background: transparent;
@@ -434,7 +434,7 @@ QTabBar::tab:selected {{
     border: 1px solid {c.border};
 }}
 
-/* ── Rolagem ─────────────────────────────────────────────── */
+/* ── Scrollbars ──────────────────────────────────────────── */
 QScrollArea {{
     border: none;
     background: transparent;
@@ -479,7 +479,7 @@ QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
     width: 0;
 }}
 
-/* ── Caixas de marcação ──────────────────────────────────── */
+/* ── Check boxes ─────────────────────────────────────────── */
 QCheckBox {{
     spacing: 9px;
     color: {c.text};
@@ -503,7 +503,7 @@ QCheckBox::indicator:checked {{
     image: none;
 }}
 
-/* ── Diversos ────────────────────────────────────────────── */
+/* ── Miscellaneous ───────────────────────────────────────── */
 QGroupBox {{
     border: 1px solid {c.border};
     border-radius: 12px;
@@ -556,7 +556,7 @@ QTextBrowser {{
     padding: 10px;
 }}
 
-/* ── Tabela do histórico ─────────────────────────────────── */
+/* ── History table ───────────────────────────────────────── */
 QTableWidget {{
     background-color: {c.surface};
     border: 1px solid {c.border};
@@ -594,7 +594,7 @@ QTableCornerButton::section {{
     border: none;
 }}
 
-/* ── Barra de status ─────────────────────────────────────── */
+/* ── Status bar ──────────────────────────────────────────── */
 QStatusBar {{
     background: transparent;
     color: {c.text_muted};

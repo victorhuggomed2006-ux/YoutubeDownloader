@@ -1,26 +1,26 @@
 <#
 .SYNOPSIS
-    Extrai as strings da interface e compila os arquivos de tradução.
+    Extracts the interface strings and compiles the translation files.
 
 .DESCRIPTION
-    Executa o ciclo padrão do Qt:
-      1. pyside6-lupdate varre o código e atualiza os arquivos .ts
-      2. pyside6-lrelease compila cada .ts em um .qm, que é o que o
-         aplicativo carrega em tempo de execução
+    Runs the standard Qt cycle:
+      1. pyside6-lupdate scans the code and updates the .ts files
+      2. pyside6-lrelease compiles each .ts into a .qm, which is what the
+         application loads at runtime
 
-    O português é o idioma de origem — as strings do código já estão nele e
-    não precisam de arquivo de tradução.
+    English is the source language — the strings in the code are already in it
+    and need no translation file.
 
-    Depois de rodar este script, traduções novas ou alteradas aparecem no .ts
-    marcadas como "unfinished". Edite-as no Qt Linguist (pyside6-linguist) ou
-    em qualquer editor de texto e rode o script de novo.
+    After running this script, new or changed entries appear in the .ts marked
+    as "unfinished". Edit them in Qt Linguist (pyside6-linguist) or in any text
+    editor, then run the script again.
 
-.PARAMETER SomenteCompilar
-    Pula a extração e apenas compila os .ts existentes.
+.PARAMETER CompileOnly
+    Skips extraction and only compiles the existing .ts files.
 #>
 [CmdletBinding()]
 param(
-    [switch]$SomenteCompilar
+    [switch]$CompileOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,52 +31,61 @@ $guiDir = Join-Path $repoRoot 'ytdownloader\gui'
 $i18nDir = Join-Path $repoRoot 'ytdownloader\resources\i18n'
 $venvScripts = Join-Path $repoRoot 'venv\Scripts'
 
-function Resolver-Ferramenta([string]$nome) {
-    $noVenv = Join-Path $venvScripts $nome
-    if (Test-Path $noVenv) { return $noVenv }
-    $noPath = Get-Command $nome -ErrorAction SilentlyContinue
-    if ($noPath) { return $noPath.Source }
-    throw "$nome nao encontrado. Instale as dependencias com: pip install -r requirements-dev.txt"
+function Resolve-Tool([string]$name) {
+    # The virtual environment normally lives beside this project, but a
+    # developer may keep it one level up, at the repository root.
+    $candidates = @(
+        (Join-Path $venvScripts $name)
+        (Join-Path (Split-Path -Parent $repoRoot) "venv\Scripts\$name")
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) { return $candidate }
+    }
+
+    $onPath = Get-Command $name -ErrorAction SilentlyContinue
+    if ($onPath) { return $onPath.Source }
+
+    throw "$name not found. Install the dependencies with: pip install -r requirements-dev.txt"
 }
 
-$lupdate = Resolver-Ferramenta 'pyside6-lupdate.exe'
-$lrelease = Resolver-Ferramenta 'pyside6-lrelease.exe'
+$lupdate = Resolve-Tool 'pyside6-lupdate.exe'
+$lrelease = Resolve-Tool 'pyside6-lrelease.exe'
 
 New-Item -ItemType Directory -Force -Path $i18nDir | Out-Null
 
-if (-not $SomenteCompilar) {
-    Write-Host 'Extraindo as strings da interface...'
-    $fontes = Get-ChildItem $guiDir -Recurse -Filter '*.py' | ForEach-Object { $_.FullName }
+if (-not $CompileOnly) {
+    Write-Host 'Extracting the interface strings...'
+    $sources = Get-ChildItem $guiDir -Recurse -Filter '*.py' | ForEach-Object { $_.FullName }
 
     foreach ($ts in Get-ChildItem $i18nDir -Filter '*.ts') {
-        # O idioma de destino vem do nome do arquivo: ytdownloader_<idioma>.ts
-        $idioma = $ts.BaseName -replace '^ytdownloader_', ''
-        Write-Host "  $($ts.Name) (destino: $idioma)"
-        & $lupdate $fontes -ts $ts.FullName -source-language pt_BR -target-language $idioma
-        if ($LASTEXITCODE -ne 0) { throw "lupdate falhou em $($ts.Name)" }
+        # The target language comes from the file name: ytdownloader_<language>.ts
+        $language = $ts.BaseName -replace '^ytdownloader_', ''
+        Write-Host "  $($ts.Name) (target: $language)"
+        & $lupdate $sources -ts $ts.FullName -source-language en -target-language $language
+        if ($LASTEXITCODE -ne 0) { throw "lupdate failed on $($ts.Name)" }
     }
 }
 
 Write-Host ''
-Write-Host 'Compilando as traducoes...'
-$pendentes = 0
+Write-Host 'Compiling the translations...'
+$pending = 0
 
 foreach ($ts in Get-ChildItem $i18nDir -Filter '*.ts') {
     $qm = Join-Path $i18nDir ($ts.BaseName + '.qm')
-    $saida = & $lrelease $ts.FullName -qm $qm
-    if ($LASTEXITCODE -ne 0) { throw "lrelease falhou em $($ts.Name)" }
+    $output = & $lrelease $ts.FullName -qm $qm
+    if ($LASTEXITCODE -ne 0) { throw "lrelease failed on $($ts.Name)" }
 
-    $saida | Where-Object { $_ -match 'Generated' } | ForEach-Object {
+    $output | Where-Object { $_ -match 'Generated' } | ForEach-Object {
         Write-Host "  $($ts.BaseName): $($_.Trim())"
         if ($_ -match '(\d+) unfinished' -and [int]$Matches[1] -gt 0) {
-            $pendentes += [int]$Matches[1]
+            $pending += [int]$Matches[1]
         }
     }
 }
 
-if ($pendentes -gt 0) {
-    Write-Warning "$pendentes mensagem(ns) ainda sem traducao. Abra o .ts no Qt Linguist para completar."
+if ($pending -gt 0) {
+    Write-Warning "$pending message(s) still untranslated. Open the .ts in Qt Linguist to finish."
 }
 
 Write-Host ''
-Write-Host "Traducoes prontas em $i18nDir"
+Write-Host "Translations ready in $i18nDir"

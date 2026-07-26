@@ -1,17 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""Receita do PyInstaller para o YouTube Downloader.
+"""PyInstaller recipe for YouTube Downloader.
 
-Gera uma pasta autocontida em dist/YouTubeDownloader com o executável, o
-FFmpeg e todas as dependências. O usuário final não precisa de Python.
+Produces a self-contained folder at dist/YouTubeDownloader holding the
+executable, FFmpeg and every dependency. The end user needs no Python.
 
-Uso:
+Usage:
     pyinstaller packaging/ytdownloader.spec --noconfirm
 """
 
 import sys
 from pathlib import Path
 
-# O PyInstaller executa este arquivo com exec(), então __file__ não existe.
+# PyInstaller runs this file through exec(), so __file__ does not exist.
 REPO_ROOT = Path(SPECPATH).resolve().parent
 SRC_DIR = REPO_ROOT
 RESOURCES_DIR = SRC_DIR / "ytdownloader" / "resources"
@@ -22,7 +22,7 @@ from ytdownloader import __app_name__, __author__, __copyright__, __version__  #
 
 APP_EXE_NAME = "YouTubeDownloader"
 
-# ── Metadados que o Windows mostra nas propriedades do arquivo ───────────
+# ── Metadata Windows shows in the file properties ───────────────────────
 _parts = tuple(int(p) for p in __version__.split(".")) + (0, 0, 0, 0)
 _filevers = _parts[:4]
 
@@ -40,7 +40,7 @@ VERSION_INFO = f"""VSVersionInfo(
   kids=[
     StringFileInfo([
       StringTable(
-        '041604B0',
+        '040904B0',
         [StringStruct('CompanyName', {__author__!r}),
          StringStruct('FileDescription', {__app_name__!r}),
          StringStruct('FileVersion', {__version__!r}),
@@ -50,7 +50,7 @@ VERSION_INFO = f"""VSVersionInfo(
          StringStruct('ProductName', {__app_name__!r}),
          StringStruct('ProductVersion', {__version__!r})])
     ]),
-    VarFileInfo([VarStruct('Translation', [1046, 1200])])
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]
 )
 """
@@ -58,18 +58,18 @@ VERSION_INFO = f"""VSVersionInfo(
 VERSION_FILE = REPO_ROOT / "packaging" / "version_info.txt"
 VERSION_FILE.write_text(VERSION_INFO, encoding="utf-8")
 
-# ── Recursos ─────────────────────────────────────────────────────────────
-# Icones, setas e as traducoes compiladas (resources/i18n/*.qm).
+# ── Resources ───────────────────────────────────────────────────────────
+# Icons, arrows and the compiled translations (resources/i18n/*.qm).
 datas = []
 if RESOURCES_DIR.is_dir():
     for item in RESOURCES_DIR.rglob("*"):
         if not item.is_file() or item.suffix == ".ts":
-            continue  # o .ts e fonte de traducao, so o .qm vai junto
-        destino = Path("resources") / item.relative_to(RESOURCES_DIR).parent
-        datas.append((str(item), str(destino)))
+            continue  # .ts is translation source; only the .qm ships
+        destination = Path("resources") / item.relative_to(RESOURCES_DIR).parent
+        datas.append((str(item), str(destination)))
 
 if not any(str(d[0]).endswith(".qm") for d in datas):
-    print("AVISO: nenhuma traducao compilada encontrada; a interface sairá so em portugues.")
+    print("WARNING: no compiled translation found; the interface will ship in English only.")
 
 # ── FFmpeg ───────────────────────────────────────────────────────────────
 binaries = []
@@ -83,12 +83,12 @@ for name in ("ffmpeg.exe", "ffprobe.exe"):
 
 if missing_ffmpeg:
     raise SystemExit(
-        "FFmpeg nao encontrado em packaging/vendor/ffmpeg: "
+        "FFmpeg not found in packaging/vendor/ffmpeg: "
         + ", ".join(missing_ffmpeg)
-        + "\nExecute primeiro: powershell -File packaging/fetch_ffmpeg.ps1"
+        + "\nRun this first: powershell -File packaging/fetch_ffmpeg.ps1"
     )
 
-# A licenca do FFmpeg acompanha os binarios, como exige a LGPL.
+# FFmpeg's licence ships with the binaries, as the LGPL requires.
 ffmpeg_license = FFMPEG_DIR / "FFMPEG-LICENSE.txt"
 if ffmpeg_license.is_file():
     datas.append((str(ffmpeg_license), "ffmpeg"))
@@ -98,7 +98,7 @@ for extra in ("LICENSE", "README.md"):
     if candidate.is_file():
         datas.append((str(candidate), "."))
 
-# ── Modulos ──────────────────────────────────────────────────────────────
+# ── Modules ─────────────────────────────────────────────────────────────
 hiddenimports = [
     "yt_dlp",
     "yt_dlp.extractor",
@@ -112,7 +112,7 @@ hiddenimports = [
     "certifi",
 ]
 
-# Nada disso e usado pelo aplicativo; tirar reduz bastante o tamanho final.
+# None of these is used by the app; excluding them cuts the final size a lot.
 excludes = [
     "tkinter",
     "unittest",
@@ -156,7 +156,7 @@ excludes = [
     "PySide6.QtSpatialAudio",
     "PySide6.QtTextToSpeech",
 ]
-# Atencao: shiboken6 e o nucleo do PySide6 e nunca pode entrar nesta lista.
+# Careful: shiboken6 is the core of PySide6 and must never join this list.
 
 
 a = Analysis(
@@ -185,7 +185,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=False,  # aplicativo de janela: sem console preto ao abrir
+    console=False,  # windowed app: no black console when it opens
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

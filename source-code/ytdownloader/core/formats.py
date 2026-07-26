@@ -1,4 +1,4 @@
-"""Catálogo de formatos e qualidades oferecidos ao usuário."""
+"""The catalogue of formats and qualities offered to the user."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ class MediaKind(str, Enum):
 
 @dataclass(frozen=True)
 class QualityOption:
-    """Uma opção de qualidade exibida na interface."""
+    """A quality choice as shown in the interface."""
 
     key: str
     label: str
@@ -22,20 +22,20 @@ class QualityOption:
 
 
 VIDEO_QUALITIES: tuple[QualityOption, ...] = (
-    QualityOption("best", "Máxima disponível", "Melhor resolução que o vídeo oferecer"),
-    QualityOption("2160p", "4K · 2160p", "Arquivos bem grandes", 2160),
-    QualityOption("1440p", "QHD · 1440p", "Alta qualidade", 1440),
-    QualityOption("1080p", "Full HD · 1080p", "Melhor equilíbrio entre qualidade e tamanho", 1080),
-    QualityOption("720p", "HD · 720p", "Leve e compatível com tudo", 720),
-    QualityOption("480p", "SD · 480p", "Economiza espaço", 480),
-    QualityOption("360p", "Baixa · 360p", "Menor arquivo possível", 360),
+    QualityOption("best", "Best available", "The highest resolution the video offers"),
+    QualityOption("2160p", "4K · 2160p", "Very large files", 2160),
+    QualityOption("1440p", "QHD · 1440p", "High quality", 1440),
+    QualityOption("1080p", "Full HD · 1080p", "Best balance of quality and size", 1080),
+    QualityOption("720p", "HD · 720p", "Light and plays everywhere", 720),
+    QualityOption("480p", "SD · 480p", "Saves space", 480),
+    QualityOption("360p", "Low · 360p", "Smallest possible file", 360),
 )
 
 AUDIO_QUALITIES: tuple[QualityOption, ...] = (
-    QualityOption("320", "320 kbps", "Qualidade máxima de áudio"),
-    QualityOption("256", "256 kbps", "Alta qualidade"),
-    QualityOption("192", "192 kbps", "Padrão recomendado"),
-    QualityOption("128", "128 kbps", "Arquivo menor"),
+    QualityOption("320", "320 kbps", "Top audio quality"),
+    QualityOption("256", "256 kbps", "High quality"),
+    QualityOption("192", "192 kbps", "Recommended default"),
+    QualityOption("128", "128 kbps", "Smaller file"),
 )
 
 AUDIO_CONTAINERS: tuple[str, ...] = ("mp3", "m4a", "opus", "wav", "flac")
@@ -69,11 +69,11 @@ def audio_quality_default() -> QualityOption:
 
 
 def build_video_format(quality_key: str, container: str = DEFAULT_VIDEO_CONTAINER) -> str:
-    """Monta o seletor de formato do yt-dlp para download de vídeo.
+    """Build the yt-dlp format selector for a video download.
 
-    A cadeia tenta, em ordem: faixas separadas no container preferido, faixas
-    separadas em qualquer container e, por fim, um arquivo já combinado. Assim o
-    download não falha quando o vídeo não oferece a combinação ideal.
+    The chain tries, in order: separate streams in the preferred container,
+    separate streams in any container, and finally an already-merged file. That
+    way the download does not fail when a video lacks the ideal combination.
     """
     option = video_quality(quality_key)
     height = option.max_height
@@ -84,12 +84,12 @@ def build_video_format(quality_key: str, container: str = DEFAULT_VIDEO_CONTAINE
         preferred = f"bestvideo{limit}[ext=mp4]+bestaudio[ext=m4a]"
     elif container == "webm":
         preferred = f"bestvideo{limit}[ext=webm]+bestaudio[ext=webm]"
-    else:  # mkv aceita qualquer combinação
+    else:  # mkv takes any combination
         preferred = f"bestvideo{limit}+bestaudio"
 
     chain = [preferred, f"bestvideo{limit}+bestaudio", f"best{limit}", "best"]
 
-    # Sem limite de altura as alternativas se repetem; mantém só a primeira ocorrência.
+    # Without a height limit the alternatives collide; keep the first of each.
     unique: list[str] = []
     for item in chain:
         if item not in unique:
@@ -98,12 +98,12 @@ def build_video_format(quality_key: str, container: str = DEFAULT_VIDEO_CONTAINE
 
 
 def build_format_sort(container: str) -> list[str]:
-    """Critérios de desempate entre formatos equivalentes.
+    """Tie-breakers between otherwise equivalent formats.
 
-    Para MP4 damos preferência a H.264 e AAC: o YouTube costuma oferecer AV1 na
-    mesma resolução, que gera arquivos menores mas não abre em players e TVs
-    mais antigos. Em MKV e WebM não há esse problema, então vale a melhor
-    compressão disponível.
+    MP4 prefers H.264 and AAC: YouTube usually offers AV1 at the same
+    resolution, which produces smaller files but does not play on older devices
+    and TVs. MKV and WebM do not carry that constraint, so the best available
+    compression wins there.
     """
     if container == "mp4":
         return ["vcodec:h264", "acodec:aac", "res", "fps"]
@@ -111,16 +111,16 @@ def build_format_sort(container: str) -> list[str]:
 
 
 def build_audio_format() -> str:
-    """Seletor de formato do yt-dlp para download somente de áudio."""
+    """The yt-dlp format selector for an audio-only download."""
     return "bestaudio/best"
 
 
 def needs_ffmpeg(kind: MediaKind, container: str) -> bool:
-    """Indica se a combinação escolhida exige FFmpeg.
+    """Whether the chosen combination requires FFmpeg.
 
-    Áudio sempre passa por conversão, exceto quando o usuário pede ``m4a``, que
-    normalmente já é o formato nativo entregue pelo YouTube. Vídeo precisa de
-    FFmpeg para juntar as faixas separadas de imagem e som.
+    Audio always goes through conversion, except for ``m4a``, which is usually
+    the native format the site already delivers. Video needs FFmpeg to merge
+    the separate picture and sound streams.
     """
     if kind is MediaKind.AUDIO:
         return container != "m4a"

@@ -1,12 +1,17 @@
-"""Atualização do yt-dlp sem reinstalar o aplicativo.
+"""Updating yt-dlp without reinstalling the application.
 
-O YouTube muda a forma de servir os vídeos com frequência, então uma cópia do
-yt-dlp congelada dentro do executável para de funcionar depois de algum tempo.
-Para evitar isso, o aplicativo baixa o pacote oficial do PyPI (um arquivo .whl,
-que é apenas um ZIP), extrai numa pasta do usuário e a coloca à frente no
-``sys.path``. Nenhuma instalação de Python ou pip é necessária.
+Sites change how they serve video often, so a copy of yt-dlp frozen inside the
+executable stops working after a while. To avoid that, the app downloads the
+official package from PyPI (a .whl file, which is just a ZIP), extracts it into
+the user's folder and puts that folder first on ``sys.path``. No Python
+installation and no pip required.
 
-``activate()`` precisa ser chamada antes do primeiro ``import yt_dlp``.
+``activate()`` must be called before the first ``import yt_dlp``.
+
+This is the only component that runs code fetched at runtime, which is why the
+checks below are not optional: the SHA-256 digest published by PyPI, refusal of
+archive members whose path escapes the destination, a size ceiling, and refusal
+of any package that does not actually contain yt-dlp.
 """
 
 from __future__ import annotations
@@ -33,7 +38,10 @@ _VERSION_RE = re.compile(r"^\d+(\.\d+)*$")
 
 
 def parse_version(text: str) -> tuple[int, ...]:
-    """Converte ``"2026.7.4"`` em ``(2026, 7, 4)`` para comparação."""
+    """Turn ``"2026.7.4"`` into ``(2026, 7, 4)`` for comparison.
+
+    Comparing as text would place "2026.10.1" before "2026.9.1".
+    """
     parts: list[int] = []
     for chunk in str(text or "").split("."):
         digits = "".join(ch for ch in chunk if ch.isdigit())
@@ -47,6 +55,8 @@ def _installed_dirs() -> list[tuple[tuple[int, ...], Path]]:
     for entry in root.iterdir() if root.is_dir() else []:
         if not entry.is_dir() or not entry.name.startswith(PACKAGE_PREFIX):
             continue
+        # An interrupted install leaves a half-written folder behind; it must
+        # not be picked over the bundled copy, which works.
         if not (entry / "yt_dlp" / "__init__.py").is_file():
             continue
         found.append((parse_version(entry.name[len(PACKAGE_PREFIX) :]), entry))
@@ -55,12 +65,14 @@ def _installed_dirs() -> list[tuple[tuple[int, ...], Path]]:
 
 
 def activate() -> str | None:
-    """Coloca a cópia mais nova do yt-dlp à frente no ``sys.path``.
+    """Put the newest downloaded yt-dlp first on ``sys.path``.
 
-    Retorna a versão ativada, ou ``None`` se a versão embutida for usada.
+    Returns the activated version, or ``None`` when the bundled one is used.
     """
     if "yt_dlp" in sys.modules:
-        logger.debug("yt-dlp já importado; mantendo a versão embutida.")
+        # Changing sys.path after the import would have no effect and would
+        # falsely suggest the update is in use.
+        logger.debug("yt-dlp already imported; keeping the bundled version.")
         return None
 
     installed = _installed_dirs()
@@ -72,22 +84,22 @@ def activate() -> str | None:
         return ".".join(str(p) for p in version)
 
     sys.path.insert(0, str(directory))
-    logger.info("Usando yt-dlp %s de %s", ".".join(str(p) for p in version), directory)
+    logger.info("Using yt-dlp %s from %s", ".".join(str(p) for p in version), directory)
     return ".".join(str(p) for p in version)
 
 
 def current_version() -> str:
-    """Versão do yt-dlp efetivamente carregada."""
+    """The yt-dlp version actually loaded."""
     try:
         from yt_dlp.version import __version__
 
         return str(__version__)
     except Exception:
-        return "desconhecida"
+        return "unknown"
 
 
 def latest_version() -> tuple[str, str, str] | None:
-    """Consulta o PyPI e devolve ``(versão, url_do_wheel, sha256)``."""
+    """Ask PyPI and return ``(version, wheel_url, sha256)``."""
     try:
         import requests
 
@@ -95,7 +107,7 @@ def latest_version() -> tuple[str, str, str] | None:
         response.raise_for_status()
         data = response.json()
     except Exception as exc:
-        logger.warning("Não foi possível consultar o PyPI: %s", exc)
+        logger.warning("Could not reach PyPI: %s", exc)
         return None
 
     version = str((data.get("info") or {}).get("version") or "")
@@ -114,7 +126,7 @@ def latest_version() -> tuple[str, str, str] | None:
 
 
 def update_available() -> str | None:
-    """Retorna a versão nova disponível, ou ``None`` se já está atualizado."""
+    """The newer version available, or ``None`` when already up to date."""
     latest = latest_version()
     if latest is None:
         return None
@@ -125,7 +137,7 @@ def update_available() -> str | None:
 
 
 def install(version: str, url: str, sha256: str = "") -> Path:
-    """Baixa e extrai o wheel do yt-dlp na pasta de dados do usuário."""
+    """Download and extract the yt-dlp wheel into the user's data folder."""
     import requests
 
     response = requests.get(url, timeout=DOWNLOAD_TIMEOUT, stream=True)
@@ -134,14 +146,15 @@ def install(version: str, url: str, sha256: str = "") -> Path:
     buffer = io.BytesIO()
     for chunk in response.iter_content(chunk_size=64 * 1024):
         buffer.write(chunk)
+        # A compromised server must not be able to fill the user's disk.
         if buffer.tell() > MAX_WHEEL_BYTES:
-            raise RuntimeError("O pacote baixado é maior que o esperado.")
+            raise RuntimeError("The downloaded package is larger than expected.")
 
     payload = buffer.getvalue()
     if sha256:
         actual = hashlib.sha256(payload).hexdigest()
         if actual != sha256:
-            raise RuntimeError("A verificação de integridade do pacote falhou.")
+            raise RuntimeError("The package failed its integrity check.")
 
     target = paths.runtime_dir() / f"{PACKAGE_PREFIX}{version}"
     staging = target.with_name(target.name + ".tmp")
@@ -150,25 +163,26 @@ def install(version: str, url: str, sha256: str = "") -> Path:
 
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         for member in archive.namelist():
-            # Recusa caminhos que tentem escapar da pasta de destino.
+            # Zip Slip: a member with ".." in its path would overwrite files
+            # outside the destination, including the application itself.
             destination = (staging / member).resolve()
             if not str(destination).startswith(str(staging.resolve())):
-                raise RuntimeError("O pacote contém caminhos inválidos.")
+                raise RuntimeError("The package contains invalid paths.")
         archive.extractall(staging)
 
     if not (staging / "yt_dlp" / "__init__.py").is_file():
         shutil.rmtree(staging, ignore_errors=True)
-        raise RuntimeError("O pacote baixado não contém o yt-dlp.")
+        raise RuntimeError("The downloaded package does not contain yt-dlp.")
 
     shutil.rmtree(target, ignore_errors=True)
     staging.replace(target)
     _prune_old(keep=target)
-    logger.info("yt-dlp %s instalado em %s", version, target)
+    logger.info("yt-dlp %s installed at %s", version, target)
     return target
 
 
 def update_now() -> str | None:
-    """Baixa a versão mais recente se houver uma. Retorna a versão instalada."""
+    """Download the newest version if there is one. Returns what was installed."""
     latest = latest_version()
     if latest is None:
         return None
@@ -182,9 +196,9 @@ def update_now() -> str | None:
 
 
 def _prune_old(keep: Path, max_kept: int = 1) -> None:
-    """Remove cópias antigas para não acumular espaço."""
+    """Remove older copies so they do not pile up on disk."""
     installed = [d for _, d in _installed_dirs() if d != keep]
     for directory in installed[: max(0, len(installed) - max_kept + 1)]:
         if str(directory) in sys.path:
-            continue  # em uso nesta sessão
+            continue  # in use in this session
         shutil.rmtree(directory, ignore_errors=True)

@@ -1,4 +1,4 @@
-# Dependências de execução
+# Runtime dependencies
 PySide6-Essentials>=6.8
 yt-dlp>=2025.1.1
 requests>=2.31

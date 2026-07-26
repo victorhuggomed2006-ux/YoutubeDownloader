@@ -1,4 +1,4 @@
-"""Exceções do aplicativo e tradução de erros do yt-dlp para linguagem clara."""
+"""Application exceptions, and yt-dlp errors turned into plain language."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import re
 
 
 class DownloaderError(Exception):
-    """Erro de download já formatado para ser exibido ao usuário."""
+    """A download error already phrased for the person using the app."""
 
     def __init__(self, message: str, *, hint: str = "") -> None:
         super().__init__(message)
@@ -20,95 +20,95 @@ class DownloaderError(Exception):
 
 
 class DownloadCancelled(DownloaderError):
-    """Levantada quando o usuário cancela o download em andamento."""
+    """Raised when the user cancels a download in progress."""
 
-    def __init__(self, message: str = "Download cancelado.") -> None:
+    def __init__(self, message: str = "Download cancelled.") -> None:
         super().__init__(message)
 
 
 class FFmpegMissingError(DownloaderError):
-    """Levantada quando a conversão exige FFmpeg e ele não foi encontrado."""
+    """Raised when a conversion needs FFmpeg and it could not be found."""
 
     def __init__(self) -> None:
         super().__init__(
-            "FFmpeg não encontrado.",
-            hint="Reinstale o aplicativo ou instale o FFmpeg e adicione-o ao PATH.",
+            "FFmpeg not found.",
+            hint="Reinstall the app, or install FFmpeg and add it to your PATH.",
         )
 
 
-# Padrões do yt-dlp mapeados para mensagens em português.
+# yt-dlp output patterns mapped to messages a non-programmer can act on.
 _ERROR_PATTERNS: tuple[tuple[str, str, str], ...] = (
     (
         r"sign in to confirm|not a bot|confirm your age.*sign in",
-        "O YouTube pediu verificação de conta para este vídeo.",
-        "Em Configurações, ative a importação de cookies do seu navegador e tente de novo.",
+        "The site asked for account verification on this video.",
+        "In Settings, turn on browser cookie import and try again.",
     ),
     (
         r"private video|this video is private",
-        "Este vídeo é privado.",
-        "Só o dono do canal consegue acessá-lo.",
+        "This video is private.",
+        "Only the channel owner can access it.",
     ),
     (
         r"members[- ]only|join this channel",
-        "Este vídeo é exclusivo para membros do canal.",
-        "É preciso ser membro e usar os cookies da sua conta.",
+        "This video is for channel members only.",
+        "You need to be a member and use your account cookies.",
     ),
     (
         r"age[- ]restricted|inappropriate for some users|confirm your age",
-        "Este vídeo tem restrição de idade.",
-        "Ative a importação de cookies do navegador em Configurações.",
+        "This video is age-restricted.",
+        "Turn on browser cookie import in Settings.",
     ),
     (
         r"video unavailable|has been removed|no longer available|removed by the uploader",
-        "Vídeo indisponível ou removido.",
+        "Video unavailable or removed.",
         "",
     ),
     (
-        # O YouTube usa "has not made this video available in your country",
-        # além das variações com "blocked" e "geo-restricted".
+        # YouTube says "has not made this video available in your country",
+        # alongside the "blocked" and "geo-restricted" variants.
         r"available in your country|blocked it in your country|geo.?(block|restrict)",
-        "Este vídeo está bloqueado na sua região.",
+        "This video is blocked in your region.",
         "",
     ),
     (
         r"live event will begin|premieres in|is not yet available",
-        "A transmissão ainda não começou.",
-        "Tente novamente quando o vídeo estiver disponível.",
+        "The stream has not started yet.",
+        "Try again once the video is available.",
     ),
     (
         r"live.*not.*download|is live",
-        "Não é possível baixar uma transmissão ao vivo em andamento.",
-        "Espere a live terminar e baixe a gravação.",
+        "A live stream in progress cannot be downloaded.",
+        "Wait for the stream to end and download the recording.",
     ),
     (
         r"requested format is not available|no video formats found",
-        "A qualidade escolhida não está disponível para este vídeo.",
-        'Escolha outra qualidade ou use "Máxima disponível".',
+        "The selected quality is not available for this video.",
+        'Pick another quality or use "Best available".',
     ),
     (
         r"unable to download|urlopen error|timed out|connection|network|getaddrinfo|resolve",
-        "Falha de conexão com o YouTube.",
-        "Verifique sua internet e tente novamente.",
+        "Connection failed.",
+        "Check your internet connection and try again.",
     ),
     (
         r"ffmpeg|ffprobe",
-        "Falha ao processar o arquivo com o FFmpeg.",
-        "Reinstale o aplicativo para restaurar os componentes.",
+        "FFmpeg failed to process the file.",
+        "Reinstall the app to restore its components.",
     ),
     (
         r"unsupported url|is not a valid url",
-        "Este link não é um vídeo do YouTube.",
+        "This site is not supported.",
         "",
     ),
     (
         r"permission denied|access is denied|errno 13",
-        "Sem permissão para gravar na pasta escolhida.",
-        "Escolha outra pasta de destino.",
+        "No permission to write to the selected folder.",
+        "Choose a different destination folder.",
     ),
     (
         r"no space left|errno 28|disk full",
-        "Espaço insuficiente em disco.",
-        "Libere espaço e tente novamente.",
+        "Not enough disk space.",
+        "Free up some space and try again.",
     ),
 )
 
@@ -117,7 +117,7 @@ _PREFIX_RE = re.compile(r"^\s*(ERROR|WARNING):\s*", re.IGNORECASE)
 
 
 def clean_message(raw: str) -> str:
-    """Remove códigos de cor e prefixos técnicos da mensagem do yt-dlp."""
+    """Strip colour codes and technical prefixes from a yt-dlp message."""
     text = _ANSI_RE.sub("", str(raw or "")).strip()
     text = _PREFIX_RE.sub("", text)
     text = re.sub(r"\[[a-zA-Z0-9:_-]+\]\s*", "", text, count=1)
@@ -125,7 +125,7 @@ def clean_message(raw: str) -> str:
 
 
 def humanize(raw: str | BaseException) -> DownloaderError:
-    """Converte um erro cru do yt-dlp em um ``DownloaderError`` legível."""
+    """Turn a raw yt-dlp error into a readable ``DownloaderError``."""
     if isinstance(raw, DownloaderError):
         return raw
 
@@ -137,9 +137,9 @@ def humanize(raw: str | BaseException) -> DownloaderError:
             return DownloaderError(message, hint=hint)
 
     if not text:
-        return DownloaderError("Não foi possível concluir o download.")
+        return DownloaderError("The download could not be completed.")
 
-    # Mantém no máximo a primeira frase para não poluir a interface.
+    # Keep the first line at most, so the interface stays readable.
     first_line = text.splitlines()[0]
     if len(first_line) > 220:
         first_line = first_line[:217] + "..."

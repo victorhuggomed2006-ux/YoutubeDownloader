@@ -1,13 +1,13 @@
-"""Tradução da interface.
+"""Interface translation.
 
-O código-fonte é escrito em português, e é o português que serve de chave para
-as traduções — é a convenção do Qt: a string escrita no código é o texto de
-origem, e cada idioma traduzido é um arquivo à parte.
+The source code is written in English, and English is what serves as the key
+for translations — that is the Qt convention: the string written in the code is
+the source text, and each translated language is a separate catalogue.
 
-O núcleo (``ytdownloader.core``) não importa nada do Qt, então suas mensagens
-não podem chamar ``tr()`` diretamente. Elas são declaradas aqui, em
-``_declarar_mensagens_do_nucleo``, para que a ferramenta de extração as
-encontre, e traduzidas em tempo de execução por :func:`traduzir_do_nucleo`.
+The core (``ytdownloader.core``) imports nothing from Qt, so its messages
+cannot call ``tr()`` directly. They are declared here, in
+``_declare_core_messages``, so the extraction tool finds them, and translated at
+runtime by :func:`translate_core`.
 """
 
 from __future__ import annotations
@@ -20,167 +20,178 @@ from ..core import paths
 
 logger = logging.getLogger(__name__)
 
-#: Contexto usado nas mensagens que nascem no núcleo.
-CONTEXTO_NUCLEO = "Nucleo"
+#: Context used for messages that originate in the core.
+CORE_CONTEXT = "Core"
 
-#: Idiomas oferecidos. A chave é o código usado nos arquivos de tradução.
-IDIOMAS: dict[str, str] = {
-    "auto": "Igual ao Windows",
-    "pt_BR": "Português (Brasil)",
+#: Languages on offer. The key is the code used in the translation files.
+LANGUAGES: dict[str, str] = {
+    "auto": "Same as Windows",
     "en": "English",
+    "pt_BR": "Português (Brasil)",
+    "es": "Español",
 }
 
-_tradutores: list[QTranslator] = []
+_translators: list[QTranslator] = []
 
 
-def traduzir_do_nucleo(mensagem: str) -> str:
-    """Traduz uma mensagem vinda do núcleo, se houver tradução para ela."""
-    if not mensagem:
-        return mensagem
-    return QCoreApplication.translate(CONTEXTO_NUCLEO, mensagem)
+def translate_core(message: str) -> str:
+    """Translate a message coming from the core, if a translation exists."""
+    if not message:
+        return message
+    return QCoreApplication.translate(CORE_CONTEXT, message)
 
 
-def idioma_efetivo(preferencia: str) -> str:
-    """Resolve ``auto`` para o idioma do sistema."""
-    if preferencia in IDIOMAS and preferencia != "auto":
-        return preferencia
+def match_language(tags: list[str]) -> str:
+    """Pick the first tag we have a catalogue for, in the order Windows ranks them.
 
-    sistema = QLocale.system().name()  # por exemplo "pt_BR" ou "en_US"
-    if sistema.startswith("pt"):
-        return "pt_BR"
+    Tags arrive in BCP 47 form and may carry a script: ``pt-Latn-BR``, ``es-419``.
+    Only the primary subtag is needed to choose between the three catalogues.
+    """
+    for tag in tags:
+        primary = tag.replace("_", "-").split("-", 1)[0].lower()
+        if primary == "pt":
+            return "pt_BR"
+        if primary == "es":
+            return "es"
+        if primary == "en":
+            return "en"
     return "en"
 
 
-def instalar(app: QCoreApplication, preferencia: str = "auto") -> str:
-    """Instala o tradutor do idioma escolhido e devolve o idioma em uso.
+def effective_language(preference: str) -> str:
+    """Resolve ``auto`` to the Windows display language."""
+    if preference in LANGUAGES and preference != "auto":
+        return preference
 
-    O português é o idioma de origem: não há arquivo a carregar, as strings do
-    código já estão nele.
+    # uiLanguages(), not name(): the latter follows the regional *format*
+    # setting, which on a Brazilian machine with an English keyboard layout
+    # reports en_US while the interface is in Portuguese.
+    system = QLocale.system()
+    return match_language([*system.uiLanguages(), system.name()])
+
+
+def install(app: QCoreApplication, preference: str = "auto") -> str:
+    """Install the chosen language and return the one in use.
+
+    English is the source language: there is no catalogue to load, since the
+    strings in the code are already in it.
     """
-    global _tradutores
+    global _translators
 
-    for tradutor in _tradutores:
-        app.removeTranslator(tradutor)
-    _tradutores = []
+    for translator in _translators:
+        app.removeTranslator(translator)
+    _translators = []
 
-    idioma = idioma_efetivo(preferencia)
-    if idioma == "pt_BR":
-        return idioma
+    language = effective_language(preference)
+    if language == "en":
+        return language
 
-    arquivo = paths.resource_path("i18n", f"ytdownloader_{idioma}.qm")
-    if not arquivo.is_file():
-        logger.warning("Tradução para %s não encontrada em %s", idioma, arquivo)
-        return "pt_BR"
+    catalogue = paths.resource_path("i18n", f"ytdownloader_{language}.qm")
+    if not catalogue.is_file():
+        logger.warning("Translation for %s not found at %s", language, catalogue)
+        return "en"
 
-    tradutor = QTranslator()
-    if not tradutor.load(str(arquivo)):
-        logger.warning("Não foi possível carregar a tradução %s", arquivo)
-        return "pt_BR"
+    translator = QTranslator()
+    if not translator.load(str(catalogue)):
+        logger.warning("Could not load the translation %s", catalogue)
+        return "en"
 
-    app.installTranslator(tradutor)
-    _tradutores.append(tradutor)
+    app.installTranslator(translator)
+    _translators.append(translator)
 
-    # Traduz também os textos próprios do Qt (botões de diálogo, menus de
-    # contexto dos campos de texto), que têm catálogo pronto.
-    qt_tradutor = QTranslator()
-    caminho_qt = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
-    if qt_tradutor.load(QLocale(idioma), "qtbase", "_", caminho_qt):
-        app.installTranslator(qt_tradutor)
-        _tradutores.append(qt_tradutor)
+    # Also translate Qt's own text — dialog buttons, text field context menus —
+    # which ships with ready-made catalogues.
+    qt_translator = QTranslator()
+    qt_path = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    if qt_translator.load(QLocale(language), "qtbase", "_", qt_path):
+        app.installTranslator(qt_translator)
+        _translators.append(qt_translator)
 
-    logger.info("Idioma da interface: %s", idioma)
-    return idioma
+    logger.info("Interface language: %s", language)
+    return language
 
 
-def _declarar_mensagens_do_nucleo() -> None:
-    """Torna visíveis à ferramenta de extração as mensagens do núcleo.
+def _declare_core_messages() -> None:
+    """Expose the core's messages to the extraction tool.
 
-    Esta função nunca é chamada. Ela existe para que ``pyside6-lupdate``
-    encontre as mensagens que o núcleo produz e as inclua no arquivo de
-    tradução — sem ela, seria preciso mantê-las à mão.
+    This function is never called. It exists so ``pyside6-lupdate`` finds the
+    messages the core produces and includes them in the translation files —
+    without it, they would have to be maintained by hand.
     """
-    # Erros de download (core/errors.py)
-    QCoreApplication.translate("Nucleo", "O YouTube pediu verificação de conta para este vídeo.")
+    # Download errors (core/errors.py)
+    QCoreApplication.translate("Core", "The site asked for account verification on this video.")
+    QCoreApplication.translate("Core", "In Settings, turn on browser cookie import and try again.")
+    QCoreApplication.translate("Core", "This video is private.")
+    QCoreApplication.translate("Core", "Only the channel owner can access it.")
+    QCoreApplication.translate("Core", "This video is for channel members only.")
+    QCoreApplication.translate("Core", "You need to be a member and use your account cookies.")
+    QCoreApplication.translate("Core", "This video is age-restricted.")
+    QCoreApplication.translate("Core", "Turn on browser cookie import in Settings.")
+    QCoreApplication.translate("Core", "Video unavailable or removed.")
+    QCoreApplication.translate("Core", "This video is blocked in your region.")
+    QCoreApplication.translate("Core", "The stream has not started yet.")
+    QCoreApplication.translate("Core", "Try again once the video is available.")
+    QCoreApplication.translate("Core", "A live stream in progress cannot be downloaded.")
+    QCoreApplication.translate("Core", "Wait for the stream to end and download the recording.")
+    QCoreApplication.translate("Core", "The selected quality is not available for this video.")
+    QCoreApplication.translate("Core", 'Pick another quality or use "Best available".')
+    QCoreApplication.translate("Core", "Connection failed.")
+    QCoreApplication.translate("Core", "Check your internet connection and try again.")
+    QCoreApplication.translate("Core", "FFmpeg failed to process the file.")
+    QCoreApplication.translate("Core", "Reinstall the app to restore its components.")
+    QCoreApplication.translate("Core", "This site is not supported.")
+    QCoreApplication.translate("Core", "No permission to write to the selected folder.")
+    QCoreApplication.translate("Core", "Choose a different destination folder.")
+    QCoreApplication.translate("Core", "Not enough disk space.")
+    QCoreApplication.translate("Core", "Free up some space and try again.")
+    QCoreApplication.translate("Core", "The download could not be completed.")
+    QCoreApplication.translate("Core", "Download cancelled.")
+    QCoreApplication.translate("Core", "FFmpeg not found.")
     QCoreApplication.translate(
-        "Nucleo",
-        "Em Configurações, ative a importação de cookies do seu navegador e tente de novo.",
+        "Core", "Reinstall the app, or install FFmpeg and add it to your PATH."
     )
-    QCoreApplication.translate("Nucleo", "Este vídeo é privado.")
-    QCoreApplication.translate("Nucleo", "Só o dono do canal consegue acessá-lo.")
-    QCoreApplication.translate("Nucleo", "Este vídeo é exclusivo para membros do canal.")
-    QCoreApplication.translate("Nucleo", "É preciso ser membro e usar os cookies da sua conta.")
-    QCoreApplication.translate("Nucleo", "Este vídeo tem restrição de idade.")
-    QCoreApplication.translate(
-        "Nucleo", "Ative a importação de cookies do navegador em Configurações."
-    )
-    QCoreApplication.translate("Nucleo", "Vídeo indisponível ou removido.")
-    QCoreApplication.translate("Nucleo", "Este vídeo está bloqueado na sua região.")
-    QCoreApplication.translate("Nucleo", "A transmissão ainda não começou.")
-    QCoreApplication.translate("Nucleo", "Tente novamente quando o vídeo estiver disponível.")
-    QCoreApplication.translate(
-        "Nucleo", "Não é possível baixar uma transmissão ao vivo em andamento."
-    )
-    QCoreApplication.translate("Nucleo", "Espere a live terminar e baixe a gravação.")
-    QCoreApplication.translate(
-        "Nucleo", "A qualidade escolhida não está disponível para este vídeo."
-    )
-    QCoreApplication.translate("Nucleo", 'Escolha outra qualidade ou use "Máxima disponível".')
-    QCoreApplication.translate("Nucleo", "Falha de conexão com o YouTube.")
-    QCoreApplication.translate("Nucleo", "Verifique sua internet e tente novamente.")
-    QCoreApplication.translate("Nucleo", "Falha ao processar o arquivo com o FFmpeg.")
-    QCoreApplication.translate("Nucleo", "Reinstale o aplicativo para restaurar os componentes.")
-    QCoreApplication.translate("Nucleo", "Este link não é um vídeo do YouTube.")
-    QCoreApplication.translate("Nucleo", "Sem permissão para gravar na pasta escolhida.")
-    QCoreApplication.translate("Nucleo", "Escolha outra pasta de destino.")
-    QCoreApplication.translate("Nucleo", "Espaço insuficiente em disco.")
-    QCoreApplication.translate("Nucleo", "Libere espaço e tente novamente.")
-    QCoreApplication.translate("Nucleo", "Não foi possível concluir o download.")
-    QCoreApplication.translate("Nucleo", "Download cancelado.")
-    QCoreApplication.translate("Nucleo", "FFmpeg não encontrado.")
-    QCoreApplication.translate(
-        "Nucleo", "Reinstale o aplicativo ou instale o FFmpeg e adicione-o ao PATH."
-    )
-    QCoreApplication.translate("Nucleo", "Este endereço não é um link de vídeo válido.")
-    QCoreApplication.translate("Nucleo", "Este endereço não é um link válido.")
-    QCoreApplication.translate("Nucleo", "Não foi possível ler as informações do vídeo.")
-    QCoreApplication.translate("Nucleo", "Esta playlist está vazia ou é privada.")
-    QCoreApplication.translate("Nucleo", "Não foi possível ler a lista de vídeos.")
-    QCoreApplication.translate("Nucleo", "Este endereço aponta para um vídeo único, não uma lista.")
-    QCoreApplication.translate("Nucleo", "O download não produziu nenhum arquivo.")
-    QCoreApplication.translate("Nucleo", "O arquivo baixado não foi encontrado no disco.")
+    QCoreApplication.translate("Core", "This address is not a valid video link.")
+    QCoreApplication.translate("Core", "This address is not a valid link.")
+    QCoreApplication.translate("Core", "Could not read the video details.")
+    QCoreApplication.translate("Core", "This playlist is empty or private.")
+    QCoreApplication.translate("Core", "Could not read the video list.")
+    QCoreApplication.translate("Core", "This address points to a single video, not a list.")
+    QCoreApplication.translate("Core", "The download produced no file.")
+    QCoreApplication.translate("Core", "The downloaded file was not found on disk.")
 
-    # Situações de uma tarefa (core/models.py)
-    QCoreApplication.translate("Nucleo", "Na fila")
-    QCoreApplication.translate("Nucleo", "Consultando")
-    QCoreApplication.translate("Nucleo", "Baixando")
-    QCoreApplication.translate("Nucleo", "Convertendo")
-    QCoreApplication.translate("Nucleo", "Concluído")
-    QCoreApplication.translate("Nucleo", "Falhou")
-    QCoreApplication.translate("Nucleo", "Cancelado")
+    # Task states (core/models.py)
+    QCoreApplication.translate("Core", "Queued")
+    QCoreApplication.translate("Core", "Looking up")
+    QCoreApplication.translate("Core", "Downloading")
+    QCoreApplication.translate("Core", "Converting")
+    QCoreApplication.translate("Core", "Done")
+    QCoreApplication.translate("Core", "Failed")
+    QCoreApplication.translate("Core", "Cancelled")
+    QCoreApplication.translate("Core", "Untitled")
 
-    # Andamento do processamento (core/downloader.py)
-    QCoreApplication.translate("Nucleo", "Consultando o vídeo...")
-    QCoreApplication.translate("Nucleo", "Finalizando arquivo...")
-    QCoreApplication.translate("Nucleo", "Convertendo o áudio...")
-    QCoreApplication.translate("Nucleo", "Juntando vídeo e áudio...")
-    QCoreApplication.translate("Nucleo", "Convertendo o vídeo...")
-    QCoreApplication.translate("Nucleo", "Aplicando a capa...")
-    QCoreApplication.translate("Nucleo", "Gravando as informações...")
-    QCoreApplication.translate("Nucleo", "Incorporando as legendas...")
-    QCoreApplication.translate("Nucleo", "Salvando na pasta de destino...")
-    QCoreApplication.translate("Nucleo", "Processando o arquivo...")
+    # Processing progress (core/downloader.py)
+    QCoreApplication.translate("Core", "Looking up the video...")
+    QCoreApplication.translate("Core", "Finishing the file...")
+    QCoreApplication.translate("Core", "Converting the audio...")
+    QCoreApplication.translate("Core", "Merging video and audio...")
+    QCoreApplication.translate("Core", "Converting the video...")
+    QCoreApplication.translate("Core", "Applying the cover art...")
+    QCoreApplication.translate("Core", "Writing the metadata...")
+    QCoreApplication.translate("Core", "Embedding the subtitles...")
+    QCoreApplication.translate("Core", "Saving to the destination folder...")
+    QCoreApplication.translate("Core", "Processing the file...")
 
-    # Qualidades e formatos (core/formats.py). Rótulos como "Full HD · 1080p"
-    # não entram: são iguais em qualquer idioma.
-    QCoreApplication.translate("Nucleo", "Baixa · 360p")
-    QCoreApplication.translate("Nucleo", "Máxima disponível")
-    QCoreApplication.translate("Nucleo", "Melhor resolução que o vídeo oferecer")
-    QCoreApplication.translate("Nucleo", "Arquivos bem grandes")
-    QCoreApplication.translate("Nucleo", "Alta qualidade")
-    QCoreApplication.translate("Nucleo", "Melhor equilíbrio entre qualidade e tamanho")
-    QCoreApplication.translate("Nucleo", "Leve e compatível com tudo")
-    QCoreApplication.translate("Nucleo", "Economiza espaço")
-    QCoreApplication.translate("Nucleo", "Menor arquivo possível")
-    QCoreApplication.translate("Nucleo", "Qualidade máxima de áudio")
-    QCoreApplication.translate("Nucleo", "Padrão recomendado")
-    QCoreApplication.translate("Nucleo", "Arquivo menor")
+    # Qualities and formats (core/formats.py). Labels such as "Full HD · 1080p"
+    # are left out: they read the same in any language.
+    QCoreApplication.translate("Core", "Best available")
+    QCoreApplication.translate("Core", "Low · 360p")
+    QCoreApplication.translate("Core", "The highest resolution the video offers")
+    QCoreApplication.translate("Core", "Very large files")
+    QCoreApplication.translate("Core", "High quality")
+    QCoreApplication.translate("Core", "Best balance of quality and size")
+    QCoreApplication.translate("Core", "Light and plays everywhere")
+    QCoreApplication.translate("Core", "Saves space")
+    QCoreApplication.translate("Core", "Smallest possible file")
+    QCoreApplication.translate("Core", "Top audio quality")
+    QCoreApplication.translate("Core", "Recommended default")
+    QCoreApplication.translate("Core", "Smaller file")

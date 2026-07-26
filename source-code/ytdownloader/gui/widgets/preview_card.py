@@ -1,4 +1,4 @@
-"""Cartão que mostra os dados do vídeo antes do download."""
+"""The card showing a video's details before downloading it."""
 
 from __future__ import annotations
 
@@ -12,12 +12,12 @@ from ...core.urls import format_duration
 THUMB_WIDTH = 160
 THUMB_HEIGHT = 90
 
-#: Separador visual entre canal, duração e demais informações.
-SEPARADOR = "  ·  "
+#: Visual separator between channel, duration and the rest. Not translatable.
+SEPARATOR = "  ·  "
 
 
 class PreviewCard(QFrame):
-    """Miniatura, título, canal e duração do vídeo consultado."""
+    """Thumbnail, title, channel and duration of the video looked up."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -53,13 +53,13 @@ class PreviewCard(QFrame):
         text_column.addStretch(1)
         layout.addLayout(text_column, 1)
 
-    # ── Estados ──────────────────────────────────────────────────────────
+    # ── States ───────────────────────────────────────────────────────────
 
     def show_loading(self) -> None:
         self.setVisible(True)
         self._thumb.clear()
         self._thumb.setText("...")
-        self._title.setText(self.tr("Consultando o vídeo..."))
+        self._title.setText(self.tr("Looking up the video..."))
         self._meta.setText("")
 
     def show_info(self, info: VideoInfo) -> None:
@@ -72,8 +72,8 @@ class PreviewCard(QFrame):
         if info.duration:
             parts.append(format_duration(info.duration))
         if info.is_live:
-            parts.append(self.tr("AO VIVO"))
-        self._meta.setText(SEPARADOR.join(parts) if parts else "")
+            parts.append(self.tr("LIVE"))
+        self._meta.setText(SEPARATOR.join(parts) if parts else "")
 
         if not self._thumb.pixmap() or self._thumb.pixmap().isNull():
             self._thumb.setText("")
@@ -82,7 +82,7 @@ class PreviewCard(QFrame):
         self.setVisible(True)
         self._thumb.clear()
         self._thumb.setText("!")
-        self._title.setText(self.tr("Não foi possível ler o vídeo"))
+        self._title.setText(self.tr("Could not read this video"))
         self._meta.setText(message)
 
     def set_thumbnail(self, data: bytes) -> None:
@@ -95,7 +95,7 @@ class PreviewCard(QFrame):
             Qt.AspectRatioMode.KeepAspectRatioByExpanding,
             Qt.TransformationMode.SmoothTransformation,
         )
-        # Recorta o excedente para preencher a área sem distorcer a imagem.
+        # Crop the overflow so the area is filled without distorting the image.
         x = max(0, (scaled.width() - THUMB_WIDTH) // 2)
         y = max(0, (scaled.height() - THUMB_HEIGHT) // 2)
         self._thumb.setText("")

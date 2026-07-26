@@ -1,4 +1,4 @@
-"""Janela principal do YouTube Downloader."""
+"""The application's main window."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ from ..core.models import (
 from ..core.settings import SettingsStore
 from ..core.urls import parse_url
 from .dialogs import AboutDialog, SettingsDialog
-from .i18n import traduzir_do_nucleo
+from .i18n import translate_core
 from .theme import build_stylesheet
 from .widgets import HistoryView, PreviewCard, QueueItemWidget
 from .workers import (
@@ -69,7 +69,7 @@ MAX_PLAYLIST_ITEMS = 100
 
 
 class MainWindow(QMainWindow):
-    """Janela única do aplicativo: entrada, opções, fila e histórico."""
+    """The single window: input, options, queue and history."""
 
     def __init__(self, settings_store: SettingsStore, history_store: HistoryStore) -> None:
         super().__init__()
@@ -83,6 +83,7 @@ class MainWindow(QMainWindow):
         self._preview_token = 0
         self._info_worker: InfoWorker | None = None
 
+        # Two pools: downloads must not starve the preview and thumbnail work.
         self._download_pool = QThreadPool()
         self._download_pool.setMaxThreadCount(
             max(1, min(settings_store.settings.max_concurrent_downloads, 5))
@@ -105,7 +106,7 @@ class MainWindow(QMainWindow):
         self._check_ffmpeg()
         self._maybe_check_updates()
 
-    # ── Construção da interface ──────────────────────────────────────────
+    # ── Building the interface ───────────────────────────────────────────
 
     def _build_ui(self) -> None:
         central = QWidget()
@@ -119,7 +120,7 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(central)
         self.setStatusBar(QStatusBar())
-        self.statusBar().showMessage(self.tr("Pronto"))
+        self.statusBar().showMessage(self.tr("Ready"))
 
     def _build_header(self) -> QHBoxLayout:
         header = QHBoxLayout()
@@ -132,20 +133,20 @@ class MainWindow(QMainWindow):
         title.setObjectName("AppTitle")
         titles.addWidget(title)
 
-        subtitle = QLabel(self.tr("Baixe vídeos e áudios na qualidade que quiser"))
+        subtitle = QLabel(self.tr("Download video and audio at any quality"))
         subtitle.setObjectName("AppSubtitle")
         titles.addWidget(subtitle)
 
         header.addLayout(titles)
         header.addStretch(1)
 
-        settings_button = QPushButton(self.tr("Configurações"))
+        settings_button = QPushButton(self.tr("Settings"))
         settings_button.setObjectName("GhostButton")
         settings_button.setCursor(Qt.CursorShape.PointingHandCursor)
         settings_button.clicked.connect(self._open_settings)
         header.addWidget(settings_button)
 
-        about_button = QPushButton(self.tr("Sobre"))
+        about_button = QPushButton(self.tr("About"))
         about_button.setObjectName("GhostButton")
         about_button.setCursor(Qt.CursorShape.PointingHandCursor)
         about_button.clicked.connect(self._open_about)
@@ -160,7 +161,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(18, 16, 18, 18)
         layout.setSpacing(12)
 
-        url_label = QLabel(self.tr("LINK DO VÍDEO"))
+        url_label = QLabel(self.tr("VIDEO LINK"))
         url_label.setObjectName("SectionLabel")
         layout.addWidget(url_label)
 
@@ -169,14 +170,14 @@ class MainWindow(QMainWindow):
 
         self._url_edit = QLineEdit()
         self._url_edit.setPlaceholderText(
-            self.tr("Cole o endereço do vídeo — YouTube, Vimeo, Twitch, SoundCloud e outros")
+            self.tr("Paste a video link — YouTube, Vimeo, Twitch, SoundCloud and more")
         )
         self._url_edit.setClearButtonEnabled(True)
         self._url_edit.textChanged.connect(self._on_url_changed)
         self._url_edit.returnPressed.connect(self._start_download)
         url_row.addWidget(self._url_edit, 1)
 
-        paste_button = QPushButton(self.tr("Colar"))
+        paste_button = QPushButton(self.tr("Paste"))
         paste_button.setObjectName("GhostButton")
         paste_button.setCursor(Qt.CursorShape.PointingHandCursor)
         paste_button.clicked.connect(self._paste_from_clipboard)
@@ -190,7 +191,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(self._build_options_row())
         layout.addLayout(self._build_folder_row())
 
-        self._download_button = QPushButton(self.tr("Baixar"))
+        self._download_button = QPushButton(self.tr("Download"))
         self._download_button.setObjectName("PrimaryButton")
         self._download_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._download_button.setEnabled(False)
@@ -206,19 +207,19 @@ class MainWindow(QMainWindow):
 
         kind_column = QVBoxLayout()
         kind_column.setSpacing(6)
-        kind_label = QLabel(self.tr("O QUE BAIXAR"))
+        kind_label = QLabel(self.tr("WHAT TO GET"))
         kind_label.setObjectName("SectionLabel")
         kind_column.addWidget(kind_label)
 
         segment = QHBoxLayout()
         segment.setSpacing(0)
 
-        self._video_button = QPushButton(self.tr("Vídeo"))
+        self._video_button = QPushButton(self.tr("Video"))
         self._video_button.setObjectName("SegmentLeft")
         self._video_button.setCheckable(True)
         self._video_button.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        self._audio_button = QPushButton(self.tr("Áudio"))
+        self._audio_button = QPushButton(self.tr("Audio"))
         self._audio_button.setObjectName("SegmentRight")
         self._audio_button.setCheckable(True)
         self._audio_button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -243,7 +244,7 @@ class MainWindow(QMainWindow):
 
         quality_column = QVBoxLayout()
         quality_column.setSpacing(6)
-        self._quality_label = QLabel(self.tr("QUALIDADE"))
+        self._quality_label = QLabel(self.tr("QUALITY"))
         self._quality_label.setObjectName("SectionLabel")
         quality_column.addWidget(self._quality_label)
         self._quality_combo = QComboBox()
@@ -254,7 +255,7 @@ class MainWindow(QMainWindow):
 
         container_column = QVBoxLayout()
         container_column.setSpacing(6)
-        container_label = QLabel(self.tr("FORMATO"))
+        container_label = QLabel(self.tr("FORMAT"))
         container_label.setObjectName("SectionLabel")
         container_column.addWidget(container_label)
         self._container_combo = QComboBox()
@@ -270,7 +271,7 @@ class MainWindow(QMainWindow):
         row = QHBoxLayout()
         row.setSpacing(8)
 
-        label = QLabel(self.tr("Salvar em:"))
+        label = QLabel(self.tr("Save to:"))
         label.setObjectName("Muted")
         row.addWidget(label)
 
@@ -279,7 +280,7 @@ class MainWindow(QMainWindow):
         self._folder_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         row.addWidget(self._folder_label, 1)
 
-        change_button = QPushButton(self.tr("Alterar pasta"))
+        change_button = QPushButton(self.tr("Change folder"))
         change_button.setObjectName("LinkButton")
         change_button.setCursor(Qt.CursorShape.PointingHandCursor)
         change_button.clicked.connect(self._choose_output_dir)
@@ -308,7 +309,7 @@ class MainWindow(QMainWindow):
         self._queue_scroll.setWidget(container)
 
         self._queue_empty = QLabel(
-            self.tr("Nenhum download na fila.\nCole um link acima e clique em Baixar.")
+            self.tr("Nothing in the queue.\nPaste a link above and click Download.")
         )
         self._queue_empty.setObjectName("EmptyState")
         self._queue_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -325,11 +326,11 @@ class MainWindow(QMainWindow):
         self._history_view = HistoryView(self._history_store)
         self._history_view.open_file_requested.connect(self._open_path)
         history_layout.addWidget(self._history_view)
-        self._tabs.addTab(history_page, self.tr("Histórico"))
+        self._tabs.addTab(history_page, self.tr("History"))
 
         return self._tabs
 
-    # ── Aparência ────────────────────────────────────────────────────────
+    # ── Appearance ───────────────────────────────────────────────────────
 
     def _apply_theme(self) -> None:
         self.setStyleSheet(build_stylesheet(self._settings_store.settings.theme))
@@ -352,16 +353,16 @@ class MainWindow(QMainWindow):
 
             self.restoreGeometry(QByteArray.fromBase64(raw.encode("ascii")))
         except Exception:
-            logger.debug("Não foi possível restaurar a geometria da janela.")
+            logger.debug("Could not restore the window geometry.")
 
-    # ── Opções ───────────────────────────────────────────────────────────
+    # ── Options ──────────────────────────────────────────────────────────
 
     @property
     def _kind(self) -> MediaKind:
         return MediaKind.AUDIO if self._audio_button.isChecked() else MediaKind.VIDEO
 
     def _reload_options(self) -> None:
-        """Recarrega qualidade e formato conforme o tipo de mídia escolhido."""
+        """Refill quality and format for the selected media kind."""
         settings = self._settings_store.settings
         is_audio = self._kind is MediaKind.AUDIO
 
@@ -372,29 +373,26 @@ class MainWindow(QMainWindow):
         self._container_combo.clear()
 
         if is_audio:
-            self._quality_label.setText(self.tr("TAXA DE BITS"))
-            for option in AUDIO_QUALITIES:
-                self._quality_combo.addItem(traduzir_do_nucleo(option.label), option.key)
-                self._quality_combo.setItemData(
-                    self._quality_combo.count() - 1,
-                    traduzir_do_nucleo(option.description),
-                    Qt.ItemDataRole.ToolTipRole,
-                )
-            for container in AUDIO_CONTAINERS:
-                self._container_combo.addItem(container.upper(), container)
+            self._quality_label.setText(self.tr("BITRATE"))
+            qualities, containers = AUDIO_QUALITIES, AUDIO_CONTAINERS
+        else:
+            self._quality_label.setText(self.tr("QUALITY"))
+            qualities, containers = VIDEO_QUALITIES, VIDEO_CONTAINERS
+
+        for option in qualities:
+            self._quality_combo.addItem(translate_core(option.label), option.key)
+            self._quality_combo.setItemData(
+                self._quality_combo.count() - 1,
+                translate_core(option.description),
+                Qt.ItemDataRole.ToolTipRole,
+            )
+        for container in containers:
+            self._container_combo.addItem(container.upper(), container)
+
+        if is_audio:
             self._select_data(self._quality_combo, settings.audio_quality)
             self._select_data(self._container_combo, settings.audio_container)
         else:
-            self._quality_label.setText(self.tr("QUALIDADE"))
-            for option in VIDEO_QUALITIES:
-                self._quality_combo.addItem(traduzir_do_nucleo(option.label), option.key)
-                self._quality_combo.setItemData(
-                    self._quality_combo.count() - 1,
-                    traduzir_do_nucleo(option.description),
-                    Qt.ItemDataRole.ToolTipRole,
-                )
-            for container in VIDEO_CONTAINERS:
-                self._container_combo.addItem(container.upper(), container)
             self._select_data(self._quality_combo, settings.video_quality)
             self._select_data(self._container_combo, settings.video_container)
 
@@ -435,20 +433,20 @@ class MainWindow(QMainWindow):
     def _choose_output_dir(self) -> None:
         current = str(self._settings_store.settings.resolved_output_dir())
         chosen = QFileDialog.getExistingDirectory(
-            self, self.tr("Escolha a pasta de destino"), current
+            self, self.tr("Choose the destination folder"), current
         )
         if chosen:
             self._settings_store.update(output_dir=chosen)
             self._update_folder_label()
 
-    # ── Entrada de URL e preview ─────────────────────────────────────────
+    # ── URL input and preview ────────────────────────────────────────────
 
     @Slot()
     def _paste_from_clipboard(self) -> None:
         clipboard = QGuiApplication.clipboard()
         text = (clipboard.text() if clipboard else "").strip()
         if not text:
-            self.statusBar().showMessage(self.tr("A área de transferência está vazia."), 4000)
+            self.statusBar().showMessage(self.tr("The clipboard is empty."), 4000)
             return
         self._url_edit.setText(text)
         self._url_edit.setFocus()
@@ -479,7 +477,7 @@ class MainWindow(QMainWindow):
         if parsed.is_playlist:
             self._preview.clear()
             self.statusBar().showMessage(
-                self.tr("Link de playlist detectado. Clique em Baixar para escolher os vídeos."),
+                self.tr("Playlist link detected. Click Download to pick the videos."),
                 6000,
             )
         elif parsed.is_supported:
@@ -487,7 +485,7 @@ class MainWindow(QMainWindow):
             self._preview_timer.start()
             if not parsed.is_youtube:
                 self.statusBar().showMessage(
-                    self.tr("Site reconhecido: {site}").format(site=parsed.site_name), 4000
+                    self.tr("Recognised site: {site}").format(site=parsed.site_name), 4000
                 )
         else:
             self._preview.clear()
@@ -504,8 +502,8 @@ class MainWindow(QMainWindow):
         self._preview_token += 1
         token = str(self._preview_token)
 
-        # No YouTube o endereço da miniatura é previsível, então ela aparece
-        # de imediato. Nos demais sites só depois que a consulta responder.
+        # On YouTube the thumbnail address is predictable, so it shows up right
+        # away. On other sites, only once the lookup answers.
         thumbnail = parsed.thumbnail_url
         if thumbnail:
             self._start_thumbnail(thumbnail, f"preview:{token}")
@@ -532,11 +530,10 @@ class MainWindow(QMainWindow):
 
     @Slot(str, str)
     def _on_preview_failed(self, token: str, message: str) -> None:
-        message = traduzir_do_nucleo(message)
         if token != str(self._preview_token):
             return
         self._current_info = None
-        self._preview.show_error(message)
+        self._preview.show_error(translate_core(message))
 
     @Slot(str, bytes)
     def _on_thumbnail_ready(self, token: str, data: bytes) -> None:
@@ -571,7 +568,7 @@ class MainWindow(QMainWindow):
         url = self._url_edit.text().strip()
         parsed = parse_url(url)
         if not parsed.is_supported:
-            self.statusBar().showMessage(self.tr("Informe um endereço de vídeo válido."), 5000)
+            self.statusBar().showMessage(self.tr("Enter a valid video address."), 5000)
             return
 
         if self._kind is MediaKind.VIDEO and not ffmpeg_module.is_available():
@@ -591,18 +588,17 @@ class MainWindow(QMainWindow):
     def _ask_playlist(self, url: str) -> None:
         answer = QMessageBox.question(
             self,
-            self.tr("Playlist detectada"),
+            self.tr("Playlist detected"),
             self.tr(
-                "Este link é de uma playlist.\n\n"
-                "Deseja adicionar os vídeos dela à fila (até {limite})?"
-            ).format(limite=MAX_PLAYLIST_ITEMS),
+                "This link points to a playlist.\n\nAdd its videos to the queue (up to {limit})?"
+            ).format(limit=MAX_PLAYLIST_ITEMS),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
 
-        self.statusBar().showMessage(self.tr("Lendo a playlist..."))
+        self.statusBar().showMessage(self.tr("Reading the playlist..."))
         worker = PlaylistWorker(url, self._cookies_setting(), "playlist")
         worker.signals.ready.connect(self._on_playlist_ready)
         worker.signals.failed.connect(self._on_playlist_failed)
@@ -616,7 +612,7 @@ class MainWindow(QMainWindow):
             self._enqueue(self._current_request(url), info)
 
         self.statusBar().showMessage(
-            self.tr("%n vídeo(s) adicionados à fila.", "", len(selected)), 6000
+            self.tr("%n video(s) added to the queue.", "", len(selected)), 6000
         )
         self._url_edit.clear()
         self._preview.clear()
@@ -624,9 +620,9 @@ class MainWindow(QMainWindow):
 
     @Slot(str, str)
     def _on_playlist_failed(self, _token: str, message: str) -> None:
-        mensagem = traduzir_do_nucleo(message)
-        self.statusBar().showMessage(mensagem, 8000)
-        QMessageBox.warning(self, self.tr("Não foi possível ler a playlist"), mensagem)
+        translated = translate_core(message)
+        self.statusBar().showMessage(translated, 8000)
+        QMessageBox.warning(self, self.tr("Could not read the playlist"), translated)
 
     def _enqueue(self, request: DownloadRequest, info: VideoInfo | None) -> None:
         task = DownloadTask(request=request, info=info)
@@ -666,7 +662,7 @@ class MainWindow(QMainWindow):
         self._download_pool.start(worker)
         self._update_status_summary()
 
-    # ── Retorno dos workers ──────────────────────────────────────────────
+    # ── Worker callbacks ─────────────────────────────────────────────────
 
     @Slot(str, object)
     def _on_task_progress(self, task_id: str, progress: Progress) -> None:
@@ -710,7 +706,7 @@ class MainWindow(QMainWindow):
         self._workers.pop(task_id, None)
         self._record_history(task)
         self.statusBar().showMessage(
-            self.tr("Concluído: {titulo}").format(titulo=task.display_title), 8000
+            self.tr("Finished: {title}").format(title=task.display_title), 8000
         )
 
         if self._settings_store.settings.open_folder_when_done:
@@ -729,7 +725,7 @@ class MainWindow(QMainWindow):
         widget.update_task(task)
         self._workers.pop(task_id, None)
         self._record_history(task)
-        self.statusBar().showMessage(traduzir_do_nucleo(message), 10000)
+        self.statusBar().showMessage(translate_core(message), 10000)
         self._update_status_summary()
 
     @Slot(str)
@@ -741,16 +737,16 @@ class MainWindow(QMainWindow):
         task.status = TaskStatus.CANCELLED
         widget.update_task(task)
         self._workers.pop(task_id, None)
-        self.statusBar().showMessage(self.tr("Download cancelado."), 5000)
+        self.statusBar().showMessage(self.tr("Download cancelled."), 5000)
         self._update_status_summary()
 
     def _record_history(self, task: DownloadTask) -> None:
         try:
             self._history_view.add_entry(HistoryEntry.from_task(task))
         except Exception:
-            logger.exception("Falha ao registrar o histórico")
+            logger.exception("Failed to record the history entry")
 
-    # ── Ações da fila ────────────────────────────────────────────────────
+    # ── Queue actions ────────────────────────────────────────────────────
 
     @Slot(str)
     def _cancel_task(self, task_id: str) -> None:
@@ -802,18 +798,16 @@ class MainWindow(QMainWindow):
             return
         target = Path(path)
         if not target.exists():
-            self.statusBar().showMessage(
-                self.tr("O arquivo não está mais no lugar de origem."), 6000
-            )
+            self.statusBar().showMessage(self.tr("The file is no longer where it was saved."), 6000)
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(target)))
 
     def _reveal_in_explorer(self, path: Path) -> None:
-        """Abre o Explorer já com o arquivo selecionado.
+        """Open Explorer with the file already selected.
 
-        O caminho vem de um arquivo que o próprio aplicativo acabou de gravar e
-        é passado como argumento de uma lista, nunca por uma linha de comando
-        interpretada — não há como o nome do arquivo virar comando.
+        The path comes from a file the application itself just wrote, and goes
+        in as a list argument rather than through an interpreted command line —
+        a file name cannot turn into a command here.
         """
         if not path.exists():
             self._open_path(str(path.parent))
@@ -822,22 +816,22 @@ class MainWindow(QMainWindow):
         if sys.platform == "win32":
             explorer = Path(os.environ.get("WINDIR", r"C:\Windows")) / "explorer.exe"
             try:
-                subprocess.run(  # noqa: S603 - argumentos em lista, sem shell
+                subprocess.run(  # noqa: S603 - list arguments, no shell
                     [str(explorer), "/select,", os.path.normpath(str(path))],
                     check=False,
                 )
                 return
             except OSError:
-                logger.debug("Não foi possível abrir o Explorer; usando a pasta.")
+                logger.debug("Could not open Explorer; falling back to the folder.")
 
         self._open_path(str(path.parent))
 
     def _update_status_summary(self) -> None:
         active = sum(1 for task in self._tasks.values() if not task.status.is_final)
         if active:
-            self.statusBar().showMessage(self.tr("%n download(s) em andamento", "", active))
+            self.statusBar().showMessage(self.tr("%n download(s) in progress", "", active))
 
-    # ── Diálogos ─────────────────────────────────────────────────────────
+    # ── Dialogs ──────────────────────────────────────────────────────────
 
     @Slot()
     def _open_settings(self) -> None:
@@ -851,15 +845,16 @@ class MainWindow(QMainWindow):
             )
 
             if dialog.language_changed:
-                # O Qt só reconstrói os textos de widgets criados depois da
-                # troca; reabrir é mais honesto do que mostrar meia tradução.
+                # Qt only rebuilds the text of widgets created after the switch;
+                # asking for a restart is more honest than showing half a
+                # translated interface.
                 QMessageBox.information(
                     self,
-                    self.tr("Idioma alterado"),
-                    self.tr("Feche e abra o aplicativo para aplicar o novo idioma."),
+                    self.tr("Language changed"),
+                    self.tr("Close and reopen the app to apply the new language."),
                 )
 
-            self.statusBar().showMessage(self.tr("Configurações salvas."), 4000)
+            self.statusBar().showMessage(self.tr("Settings saved."), 4000)
 
     @Slot()
     def _open_about(self) -> None:
@@ -869,25 +864,22 @@ class MainWindow(QMainWindow):
         if ffmpeg_module.is_available():
             return
         self.statusBar().showMessage(
-            self.tr(
-                "FFmpeg não encontrado — a conversão de áudio e a alta resolução "
-                "ficam indisponíveis."
-            ),
+            self.tr("FFmpeg not found — audio conversion and high resolution are unavailable."),
             12000,
         )
 
     def _warn_missing_ffmpeg(self) -> None:
         QMessageBox.warning(
             self,
-            self.tr("FFmpeg não encontrado"),
+            self.tr("FFmpeg not found"),
             self.tr(
-                "O FFmpeg é necessário para juntar vídeo e áudio e para converter arquivos.\n\n"
-                "Se você instalou pelo instalador oficial, reinstale o aplicativo. "
-                "Rodando pelo código-fonte, execute packaging/fetch_ffmpeg.ps1."
+                "FFmpeg is required to merge video with audio and to convert files.\n\n"
+                "If you used the official installer, reinstall the app. Running from "
+                "source, execute packaging/fetch_ffmpeg.ps1."
             ),
         )
 
-    # ── Atualização do yt-dlp ────────────────────────────────────────────
+    # ── yt-dlp updates ───────────────────────────────────────────────────
 
     def _maybe_check_updates(self) -> None:
         if not self._settings_store.settings.check_ytdlp_updates:
@@ -900,19 +892,19 @@ class MainWindow(QMainWindow):
     def _on_update_available(self, version: str) -> None:
         answer = QMessageBox.question(
             self,
-            self.tr("Atualização disponível"),
+            self.tr("Update available"),
             self.tr(
-                "Existe uma versão mais nova do motor de download (yt-dlp {versao}).\n\n"
-                "Manter esse componente atualizado é o que garante que os downloads "
-                "continuem funcionando. Deseja atualizar agora?"
-            ).format(versao=version),
+                "A newer version of the download engine is available (yt-dlp {version}).\n\n"
+                "Keeping this component up to date is what keeps downloads working. "
+                "Update now?"
+            ).format(version=version),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
 
-        self.statusBar().showMessage(self.tr("Atualizando o motor de download..."))
+        self.statusBar().showMessage(self.tr("Updating the download engine..."))
         worker = UpdateInstallWorker()
         worker.signals.installed.connect(self._on_update_installed)
         worker.signals.failed.connect(self._on_update_failed)
@@ -921,33 +913,33 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def _on_update_failed(self, message: str) -> None:
         self.statusBar().showMessage(
-            self.tr("Falha ao atualizar: {motivo}").format(motivo=message), 10000
+            self.tr("Update failed: {reason}").format(reason=message), 10000
         )
 
     @Slot(str)
     def _on_update_installed(self, version: str) -> None:
         self.statusBar().showMessage(
-            self.tr("yt-dlp {versao} instalado.").format(versao=version), 8000
+            self.tr("yt-dlp {version} installed.").format(version=version), 8000
         )
         QMessageBox.information(
             self,
-            self.tr("Atualização concluída"),
+            self.tr("Update complete"),
             self.tr(
-                "O motor de download foi atualizado para a versão {versao}.\n\n"
-                "Feche e abra o aplicativo para começar a usá-la."
-            ).format(versao=version),
+                "The download engine was updated to version {version}.\n\n"
+                "Close and reopen the app to start using it."
+            ).format(version=version),
         )
 
-    # ── Encerramento ─────────────────────────────────────────────────────
+    # ── Shutdown ─────────────────────────────────────────────────────────
 
     def closeEvent(self, event) -> None:
         active = [task for task in self._tasks.values() if not task.status.is_final]
         if active:
             answer = QMessageBox.question(
                 self,
-                self.tr("Sair do aplicativo"),
+                self.tr("Quit the application"),
                 self.tr(
-                    "Existem %n download(s) em andamento.\n\nDeseja cancelar e sair?",
+                    "There are %n download(s) in progress.\n\nCancel them and quit?",
                     "",
                     len(active),
                 ),

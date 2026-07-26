@@ -1,8 +1,8 @@
-# Verificação de cada push e pull request: linter e testes.
+# Checks every push and pull request: linter and tests.
 #
-# Todo o projeto Python vive em source-code/, então os jobs rodam a partir de
-# lá. O build completo do instalador não roda aqui — ele exige baixar o FFmpeg
-# (~200 MB) e leva vários minutos. Isso fica no workflow de release.
+# The whole Python project lives in source-code/, so the jobs run from
+# there. The full installer build does not run here — it needs FFmpeg
+# (~200 MB) and takes several minutes. That belongs to the release workflow.
 
 name: CI
 
@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # Um push novo cancela a verificação anterior do mesmo branch.
+  # A new push cancels the previous check on the same branch.
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
@@ -37,23 +37,23 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instalar o ruff
+      - name: Install ruff
         run: pip install ruff
 
-      - name: Verificar o estilo
+      - name: Check the style
         run: ruff check --output-format=github .
 
-      - name: Verificar a formatação
+      - name: Check the formatting
         run: ruff format --check .
 
   tests:
-    name: Testes (Python ${{ matrix.python }})
+    name: Tests (Python ${{ matrix.python }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        # A versão mínima suportada e a mais recente estável. As do meio
-        # raramente quebram sozinhas e dobrariam o tempo de espera.
+        # The minimum supported version and the latest stable one. The ones
+        # in between rarely break on their own and would double the wait.
         python: ["3.10", "3.13"]
 
     steps:
@@ -65,22 +65,22 @@ jobs:
           cache: pip
           cache-dependency-path: source-code/requirements-dev.txt
 
-      - name: Instalar as dependências
+      - name: Install the dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Rodar os testes
+      - name: Run the tests
         run: pytest --cov --cov-report=xml --cov-report=term
 
-      - name: Enviar a cobertura
+      - name: Upload the coverage
         if: matrix.python == '3.13'
         uses: actions/upload-artifact@v4
         with:
-          name: cobertura
+          name: coverage
           path: source-code/coverage.xml
           retention-days: 14
 
   build-check:
-    name: O aplicativo abre?
+    name: Does the app open?
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -91,17 +91,17 @@ jobs:
           cache: pip
           cache-dependency-path: source-code/requirements-dev.txt
 
-      - name: Instalar as dependências
+      - name: Install the dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Gerar ícones e traduções
+      - name: Generate icons and translations
         run: |
           python packaging/make_icon.py
-          powershell -ExecutionPolicy Bypass -File packaging/build_translations.ps1 -SomenteCompilar
+          powershell -ExecutionPolicy Bypass -File packaging/build_translations.ps1 -CompileOnly
 
-      # Sem isso o Qt não encontra plataforma gráfica no runner e a janela
-      # nem chega a ser criada.
-      - name: Abrir a janela em modo invisível
+      # Without this Qt finds no graphics platform on the runner and the
+      # window is never even created.
+      - name: Open the window offscreen
         env:
           QT_QPA_PLATFORM: offscreen
           PYTHONPATH: .

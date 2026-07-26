@@ -1,4 +1,4 @@
-"""Testes de validação e normalização de endereços."""
+"""Tests for address validation and normalisation."""
 
 from __future__ import annotations
 
@@ -32,11 +32,11 @@ VIDEO_ID = "dQw4w9WgXcQ"
         f"https://www.youtube.com/embed/{VIDEO_ID}",
         f"https://www.youtube.com/live/{VIDEO_ID}",
         f"https://www.youtube-nocookie.com/embed/{VIDEO_ID}",
-        f"youtube.com/watch?v={VIDEO_ID}",  # sem esquema, como se costuma colar
-        f"  https://youtu.be/{VIDEO_ID}  ",  # com espaços em volta
+        f"youtube.com/watch?v={VIDEO_ID}",  # no scheme, as people paste it
+        f"  https://youtu.be/{VIDEO_ID}  ",  # surrounded by whitespace
     ],
 )
-def test_extrai_id_de_video(url: str) -> None:
+def test_extracts_video_id(url: str) -> None:
     parsed = parse_url(url)
     assert parsed.is_supported
     assert parsed.is_youtube
@@ -44,7 +44,7 @@ def test_extrai_id_de_video(url: str) -> None:
     assert parsed.canonical == f"https://www.youtube.com/watch?v={VIDEO_ID}"
 
 
-def test_playlist_pura() -> None:
+def test_plain_playlist() -> None:
     parsed = parse_url("https://www.youtube.com/playlist?list=PLabc123def")
     assert parsed.is_supported
     assert parsed.is_playlist
@@ -53,73 +53,73 @@ def test_playlist_pura() -> None:
     assert parsed.canonical == "https://www.youtube.com/playlist?list=PLabc123def"
 
 
-def test_video_dentro_de_playlist_baixa_apenas_o_video() -> None:
+def test_video_inside_playlist_downloads_only_the_video() -> None:
     parsed = parse_url(f"https://www.youtube.com/watch?v={VIDEO_ID}&list=PLabc123")
     assert parsed.video_id == VIDEO_ID
     assert parsed.playlist_id == "PLabc123"
-    assert not parsed.is_playlist  # o vídeo tem prioridade sobre a lista
+    assert not parsed.is_playlist  # the video wins over the list
 
 
-def test_mix_gerado_pelo_youtube_nao_conta_como_playlist() -> None:
+def test_youtube_mix_is_not_treated_as_a_playlist() -> None:
     parsed = parse_url(f"https://www.youtube.com/watch?v={VIDEO_ID}&list=RD{VIDEO_ID}")
     assert parsed.video_id == VIDEO_ID
     assert parsed.playlist_id is None
 
 
-def test_url_da_miniatura_so_existe_para_o_youtube() -> None:
+def test_thumbnail_url_exists_only_for_youtube() -> None:
     assert parse_url(f"https://youtu.be/{VIDEO_ID}").thumbnail_url == (
         f"https://i.ytimg.com/vi/{VIDEO_ID}/hqdefault.jpg"
     )
     assert parse_url("https://vimeo.com/123456").thumbnail_url is None
 
 
-def test_endereco_do_youtube_sem_video_nao_serve() -> None:
-    """A home e a busca do YouTube não apontam para nada baixável."""
+def test_youtube_address_without_a_video_is_useless() -> None:
+    """The home page and the search page point at nothing downloadable."""
     assert not parse_url("https://www.youtube.com/").is_supported
-    assert not parse_url("https://www.youtube.com/results?search_query=teste").is_supported
-    assert not parse_url("https://www.youtube.com/watch?v=curto").is_supported
+    assert not parse_url("https://www.youtube.com/results?search_query=test").is_supported
+    assert not parse_url("https://www.youtube.com/watch?v=short").is_supported
 
 
-# ── Outros sites ─────────────────────────────────────────────────────────
+# ── Other sites ──────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(
-    ("url", "nome"),
+    ("url", "name"),
     [
         ("https://vimeo.com/123456", "Vimeo"),
         ("https://www.twitch.tv/videos/123", "Twitch"),
-        ("https://soundcloud.com/artista/faixa", "SoundCloud"),
+        ("https://soundcloud.com/artist/track", "SoundCloud"),
         ("https://www.dailymotion.com/video/x8abc", "Dailymotion"),
-        ("https://x.com/usuario/status/123", "X"),
-        ("https://www.reddit.com/r/videos/comments/abc/titulo/", "Reddit"),
-        ("https://artista.bandcamp.com/track/musica", "Bandcamp"),
+        ("https://x.com/user/status/123", "X"),
+        ("https://www.reddit.com/r/videos/comments/abc/title/", "Reddit"),
+        ("https://artist.bandcamp.com/track/song", "Bandcamp"),
     ],
 )
-def test_aceita_outros_sites_e_reconhece_o_nome(url: str, nome: str) -> None:
+def test_accepts_other_sites_and_names_them(url: str, name: str) -> None:
     parsed = parse_url(url)
     assert parsed.is_supported
     assert not parsed.is_youtube
-    assert parsed.site_name == nome
+    assert parsed.site_name == name
 
 
-def test_site_desconhecido_e_aceito_com_o_dominio_como_nome() -> None:
-    """Quem decide se sabe extrair é o yt-dlp, não esta validação."""
-    parsed = parse_url("https://www.site-de-video-obscuro.com.br/assistir/123")
+def test_unknown_site_is_accepted_with_its_domain_as_the_name() -> None:
+    """yt-dlp decides what it supports, not this validation."""
+    parsed = parse_url("https://www.some-obscure-video-site.co.uk/watch/123")
     assert parsed.is_supported
-    assert parsed.site_name == "site-de-video-obscuro.com.br"
+    assert parsed.site_name == "some-obscure-video-site.co.uk"
 
 
-def test_endereco_de_outro_site_nao_e_reescrito() -> None:
-    """Cada site tem sua convenção; reescrever o endereço quebraria o link."""
-    url = "https://vimeo.com/123456?parametro=importante"
+def test_other_site_addresses_are_not_rewritten() -> None:
+    """Every site has its own conventions; rewriting would break the link."""
+    url = "https://vimeo.com/123456?parameter=matters"
     assert parse_url(url).canonical == url
 
 
-def test_endereco_sem_esquema_recebe_https() -> None:
+def test_address_without_scheme_gets_https() -> None:
     assert parse_url("vimeo.com/123456").canonical == "https://vimeo.com/123456"
 
 
-# ── Recusas ──────────────────────────────────────────────────────────────
+# ── Rejections ───────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(
@@ -127,32 +127,32 @@ def test_endereco_sem_esquema_recebe_https() -> None:
     [
         "",
         "   ",
-        "não é uma url",
+        "not a url",
         "javascript:alert(1)",
         "file:///C:/Windows/System32/config/SAM",
-        "ftp://exemplo.com/video.mp4",
+        "ftp://example.com/video.mp4",
         "data:text/html,<script>alert(1)</script>",
         "http://",
-        "https://semdominio",  # sem ponto: não é um host público
-        "https://-invalido-.com",
+        "https://nodomain",  # no dot: not a public host
+        "https://-invalid-.com",
     ],
 )
-def test_recusa_enderecos_invalidos_ou_perigosos(url: str) -> None:
+def test_rejects_invalid_or_dangerous_addresses(url: str) -> None:
     assert not parse_url(url).is_supported
     assert not is_supported_url(url)
 
 
-def test_recusa_esquemas_que_nao_sejam_http() -> None:
-    """Só http e https: os demais não têm o que fazer num downloader."""
-    for esquema in ("file", "ftp", "javascript", "data", "smb"):
-        assert not is_supported_url(f"{esquema}://exemplo.com/coisa")
+def test_rejects_non_http_schemes() -> None:
+    """http and https only: the rest have no business in a downloader."""
+    for scheme in ("file", "ftp", "javascript", "data", "smb"):
+        assert not is_supported_url(f"{scheme}://example.com/thing")
 
 
-# ── Formatação ───────────────────────────────────────────────────────────
+# ── Formatting ───────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(
-    ("segundos", "esperado"),
+    ("seconds", "expected"),
     [
         (None, "--:--"),
         (0, "--:--"),
@@ -165,12 +165,12 @@ def test_recusa_esquemas_que_nao_sejam_http() -> None:
         (86399, "23:59:59"),
     ],
 )
-def test_formata_duracao(segundos, esperado: str) -> None:
-    assert format_duration(segundos) == esperado
+def test_formats_duration(seconds, expected: str) -> None:
+    assert format_duration(seconds) == expected
 
 
 @pytest.mark.parametrize(
-    ("bytes_", "esperado"),
+    ("size", "expected"),
     [
         (None, "--"),
         (0, "--"),
@@ -180,11 +180,11 @@ def test_formata_duracao(segundos, esperado: str) -> None:
         (3 * 1024 * 1024 * 1024, "3.0 GB"),
     ],
 )
-def test_formata_tamanho(bytes_, esperado: str) -> None:
-    assert format_size(bytes_) == esperado
+def test_formats_size(size, expected: str) -> None:
+    assert format_size(size) == expected
 
 
-def test_formata_velocidade_e_tempo_restante() -> None:
+def test_formats_speed_and_time_left() -> None:
     assert format_speed(1024 * 1024) == "1.0 MB/s"
     assert format_speed(None) == "--"
     assert format_eta(90) == "01:30"

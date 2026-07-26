@@ -1,4 +1,4 @@
-"""Configurações do aplicativo, persistidas em JSON na pasta do usuário."""
+"""Application settings, stored as JSON in the user's data folder."""
 
 from __future__ import annotations
 
@@ -18,13 +18,31 @@ from .formats import (
 
 logger = logging.getLogger(__name__)
 
-#: Navegadores aceitos para importar cookies (contorna o "confirme que você não é um robô").
-COOKIE_BROWSERS = ("nenhum", "chrome", "edge", "firefox", "brave", "opera", "vivaldi", "chromium")
+#: Browsers cookies can be imported from, which clears the "confirm you are
+#: not a bot" prompts. "none" disables the feature, and is the default.
+COOKIE_BROWSERS = ("none", "chrome", "edge", "firefox", "brave", "opera", "vivaldi", "chromium")
+
+#: 1.2.0 stored this setting in Portuguese. Left alone, the value would reach
+#: yt-dlp as a browser name and every download would fail.
+_LEGACY_COOKIE_VALUES = {"nenhum": "none"}
+
+
+def _migrate(raw: dict) -> bool:
+    """Bring values written by an older version up to date, in place.
+
+    Returns whether anything changed, so the caller can write the file back.
+    """
+    cookies = raw.get("cookies_from_browser")
+    if isinstance(cookies, str) and cookies in _LEGACY_COOKIE_VALUES:
+        raw["cookies_from_browser"] = _LEGACY_COOKIE_VALUES[cookies]
+        logger.info("Setting migrated: cookies_from_browser %r -> 'none'", cookies)
+        return True
+    return False
 
 
 @dataclass
 class Settings:
-    """Preferências do usuário."""
+    """The user's preferences."""
 
     output_dir: str = ""
     last_kind: str = "video"
@@ -33,12 +51,12 @@ class Settings:
     video_container: str = DEFAULT_VIDEO_CONTAINER
     audio_container: str = DEFAULT_AUDIO_CONTAINER
     theme: str = "dark"
-    #: "auto" segue o idioma do Windows; ou "pt_BR" / "en".
+    #: "auto" follows the Windows language; otherwise "en", "pt_BR" or "es".
     language: str = "auto"
     embed_thumbnail: bool = True
     embed_metadata: bool = True
     write_subtitles: bool = False
-    cookies_from_browser: str = "nenhum"
+    cookies_from_browser: str = "none"
     max_concurrent_downloads: int = 2
     open_folder_when_done: bool = False
     check_ytdlp_updates: bool = True
@@ -51,12 +69,15 @@ class Settings:
 
 
 class SettingsStore:
-    """Lê e grava as configurações em disco de forma tolerante a falhas."""
+    """Reads and writes the settings, tolerating a broken file."""
 
     def __init__(self, path: Path | None = None) -> None:
         self._path = path or paths.settings_file()
         self._lock = threading.Lock()
+        self._migrated = False
         self._settings = self._load()
+        if self._migrated:
+            self.save()
 
     @property
     def path(self) -> Path:
@@ -70,24 +91,28 @@ class SettingsStore:
         if not self._path.exists():
             return Settings()
         try:
-            raw = json.loads(self._path.read_text(encoding="utf-8"))
+            # utf-8-sig, not utf-8: Notepad and PowerShell both write a BOM,
+            # and a file edited by hand should still load.
+            raw = json.loads(self._path.read_text(encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError) as exc:
-            logger.warning("Não foi possível ler as configurações (%s); usando padrões.", exc)
+            logger.warning("Could not read the settings (%s); using defaults.", exc)
             return Settings()
 
         if not isinstance(raw, dict):
             return Settings()
 
+        # A file written by a newer version must not crash an older one.
         known = {f.name for f in fields(Settings)}
         filtered = {key: value for key, value in raw.items() if key in known}
+        self._migrated = _migrate(filtered)
         try:
             return Settings(**filtered)
         except TypeError as exc:
-            logger.warning("Configurações inválidas (%s); usando padrões.", exc)
+            logger.warning("Invalid settings (%s); using defaults.", exc)
             return Settings()
 
     def save(self) -> None:
-        """Grava as configurações, sem deixar o app quebrar se o disco falhar."""
+        """Persist the settings without letting a disk error break the app."""
         with self._lock:
             try:
                 self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -98,10 +123,10 @@ class SettingsStore:
                 )
                 temp.replace(self._path)
             except OSError as exc:
-                logger.error("Falha ao salvar configurações: %s", exc)
+                logger.error("Failed to save the settings: %s", exc)
 
     def update(self, **values: object) -> None:
-        """Atualiza campos conhecidos e persiste."""
+        """Update known fields and persist."""
         known = {f.name for f in fields(Settings)}
         for key, value in values.items():
             if key in known:

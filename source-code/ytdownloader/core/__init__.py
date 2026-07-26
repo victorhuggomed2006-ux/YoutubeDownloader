@@ -1,4 +1,4 @@
-"""Núcleo do aplicativo: regras de download independentes da interface."""
+"""The application core: download rules, independent of any interface."""
 
 from .errors import DownloadCancelled, DownloaderError, FFmpegMissingError
 from .formats import MediaKind

@@ -1,0 +1,20 @@
+# Normalise line endings in the repository to LF; Git still checks out CRLF on
+# Windows. Without this, the same file arrives with different endings depending
+# on who cloned it, and every diff turns into noise.
+* text=auto eol=lf
+
+# PowerShell and the WiX sources are only ever run on Windows.
+*.ps1  text eol=crlf
+*.wxs  text eol=crlf
+*.rtf  text eol=crlf
+
+# Binaries: never touch, never diff.
+*.msi  binary
+*.png  binary
+*.ico  binary
+*.qm   binary
+
+# Qt translation catalogues are XML, not TypeScript. Without this GitHub
+# reports the project as a TypeScript one, and the generated flag keeps them
+# out of the diff summary so real changes stay readable.
+*.ts   text eol=lf linguist-language=XML linguist-generated=true

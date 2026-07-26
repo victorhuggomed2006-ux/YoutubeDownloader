@@ -1,8 +1,8 @@
-"""Ponto de entrada do aplicativo.
+"""The application entry point.
 
-A ordem aqui importa: a atualização do yt-dlp precisa ser ativada antes de
-qualquer import do motor de download, para que a versão baixada pelo usuário
-tenha prioridade sobre a que veio embutida no executável.
+Order matters here: the yt-dlp update must be activated before anything imports
+the download engine, so the version downloaded by the user takes precedence
+over the one bundled in the executable.
 """
 
 from __future__ import annotations
@@ -16,40 +16,41 @@ logger = logging.getLogger(__name__)
 
 
 def _install_excepthook() -> None:
-    """Registra falhas não tratadas no log em vez de encerrar em silêncio."""
+    """Log unhandled failures instead of dying silently."""
 
     def handler(exc_type, exc_value, exc_traceback) -> None:
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
-        logger.critical("Erro não tratado", exc_info=(exc_type, exc_value, exc_traceback))
+        logger.critical("Unhandled error", exc_info=(exc_type, exc_value, exc_traceback))
 
     sys.excepthook = handler
 
 
 def _log_components() -> None:
-    """Registra o estado dos componentes externos — ajuda a diagnosticar suporte."""
+    """Record the state of the external components — this is what makes a bug
+    report actionable."""
     from .core import ffmpeg, jsruntime, paths
 
-    logger.info("Instalado em: %s", paths.install_dir())
-    logger.info("Dados do usuário: %s", paths.app_data_dir())
+    logger.info("Installed at: %s", paths.install_dir())
+    logger.info("User data: %s", paths.app_data_dir())
     logger.info("yt-dlp: %s", updater.current_version())
-    logger.info("FFmpeg: %s", ffmpeg.ffmpeg_path() or "não encontrado")
-    logger.info("Runtimes JavaScript: %s", ", ".join(jsruntime.names()) or "nenhum")
+    logger.info("FFmpeg: %s", ffmpeg.ffmpeg_path() or "not found")
+    logger.info("JavaScript runtimes: %s", ", ".join(jsruntime.names()) or "none")
 
 
 def main() -> int:
-    """Inicializa e executa a aplicação. Retorna o código de saída."""
+    """Start and run the application. Returns the exit code."""
     logging_setup.configure()
     _install_excepthook()
 
     activated = updater.activate()
     if activated:
-        logger.info("Motor de download atualizado em uso: yt-dlp %s", activated)
+        logger.info("Updated download engine in use: yt-dlp %s", activated)
 
     _log_components()
 
-    # Importado só agora: o Qt é pesado e depende do sys.path já ajustado.
+    # Imported only now: Qt is heavy and depends on sys.path being set already.
     from PySide6.QtCore import Qt
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
@@ -58,14 +59,15 @@ def main() -> int:
     from .core import paths
     from .core.history import HistoryStore
     from .core.settings import SettingsStore
+    from .gui import i18n
     from .gui.main_window import MainWindow
 
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
 
     app = QApplication(sys.argv)
     app.setApplicationName(__app_name__)
-    # Sem setApplicationDisplayName: o Qt o acrescentaria ao título da janela,
-    # que já traz o nome do aplicativo.
+    # No setApplicationDisplayName: Qt would append it to the window title,
+    # which already carries the application name.
     app.setApplicationVersion(__version__)
     app.setOrganizationName(__author__)
 
@@ -78,15 +80,15 @@ def main() -> int:
     settings_store = SettingsStore()
     history_store = HistoryStore()
 
-    from .gui import i18n
-
-    idioma = i18n.instalar(app, settings_store.settings.language)
-    logger.info("Idioma da interface: %s", idioma)
+    # Must run before the window is built: Qt only translates widgets created
+    # after the translator is installed.
+    language = i18n.install(app, settings_store.settings.language)
+    logger.info("Interface language: %s", language)
 
     window = MainWindow(settings_store, history_store)
     window.show()
 
-    logger.info("%s %s iniciado", __app_name__, __version__)
+    logger.info("%s %s started", __app_name__, __version__)
     return app.exec()
 
 

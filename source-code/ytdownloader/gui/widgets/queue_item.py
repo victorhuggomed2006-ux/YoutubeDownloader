@@ -1,4 +1,4 @@
-"""Item da fila de downloads."""
+"""One row in the download queue."""
 
 from __future__ import annotations
 
@@ -16,17 +16,17 @@ from PySide6.QtWidgets import (
 from ...core.formats import MediaKind
 from ...core.models import DownloadTask, Progress, TaskStatus
 from ...core.urls import format_eta, format_size, format_speed
-from ..i18n import traduzir_do_nucleo
+from ..i18n import translate_core
 
 THUMB_WIDTH = 96
 THUMB_HEIGHT = 54
 
-#: Separador visual entre as informações da linha. Não é texto traduzível.
-SEPARADOR = "  ·  "
+#: Visual separator between the pieces of information. Not translatable.
+SEPARATOR = "  ·  "
 
 
 class QueueItemWidget(QFrame):
-    """Uma linha da fila: miniatura, título, progresso e ações."""
+    """A queue row: thumbnail, title, progress and actions."""
 
     cancel_requested = Signal(str)
     remove_requested = Signal(str)
@@ -66,7 +66,7 @@ class QueueItemWidget(QFrame):
         self._progress.setFixedHeight(8)
         column.addWidget(self._progress)
 
-        self._status = QLabel(TaskStatus.QUEUED.label)
+        self._status = QLabel(translate_core(TaskStatus.QUEUED.label))
         self._status.setObjectName("QueueMeta")
         self._status.setWordWrap(True)
         column.addWidget(self._status)
@@ -77,13 +77,13 @@ class QueueItemWidget(QFrame):
         actions.setSpacing(6)
         actions.addStretch(1)
 
-        self._primary_button = QPushButton(self.tr("Cancelar"))
+        self._primary_button = QPushButton(self.tr("Cancel"))
         self._primary_button.setObjectName("GhostButton")
         self._primary_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._primary_button.clicked.connect(self._on_primary_clicked)
         actions.addWidget(self._primary_button)
 
-        self._secondary_button = QPushButton(self.tr("Abrir pasta"))
+        self._secondary_button = QPushButton(self.tr("Open folder"))
         self._secondary_button.setObjectName("GhostButton")
         self._secondary_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._secondary_button.setVisible(False)
@@ -95,7 +95,7 @@ class QueueItemWidget(QFrame):
 
         self.update_task(task)
 
-    # ── Atualização ──────────────────────────────────────────────────────
+    # ── Updating ─────────────────────────────────────────────────────────
 
     def set_thumbnail(self, data: bytes) -> None:
         pixmap = QPixmap()
@@ -112,7 +112,7 @@ class QueueItemWidget(QFrame):
         self._thumb.setPixmap(scaled.copy(x, y, THUMB_WIDTH, THUMB_HEIGHT))
 
     def update_task(self, task: DownloadTask) -> None:
-        """Redesenha o item a partir do estado atual da tarefa."""
+        """Redraw the row from the task's current state."""
         self._task = task
         self._title.setText(self._elided_title(task.display_title))
         self._title.setToolTip(task.display_title)
@@ -134,33 +134,33 @@ class QueueItemWidget(QFrame):
         self._progress.setValue(int(max(0.0, min(progress.percent, 100.0)) * 10))
         self._set_progress_state("normal")
 
-        kind_label = self.tr("Áudio") if task.request.kind is MediaKind.AUDIO else self.tr("Vídeo")
+        kind_label = self.tr("Audio") if task.request.kind is MediaKind.AUDIO else self.tr("Video")
         quality = task.request.quality
         if task.request.kind is MediaKind.AUDIO:
-            quality = self.tr("{taxa} kbps").format(taxa=quality)
-        base = SEPARADOR.join([kind_label, quality, task.request.container.upper()])
+            quality = self.tr("{rate} kbps").format(rate=quality)
+        base = SEPARATOR.join([kind_label, quality, task.request.container.upper()])
 
         if status is TaskStatus.DOWNLOADING:
             pieces = [f"{progress.percent:.1f}%"]
             if progress.total_bytes:
                 pieces.append(
-                    self.tr("{baixado} de {total}").format(
-                        baixado=format_size(progress.downloaded_bytes),
+                    self.tr("{done} of {total}").format(
+                        done=format_size(progress.downloaded_bytes),
                         total=format_size(progress.total_bytes),
                     )
                 )
             if progress.speed:
                 pieces.append(format_speed(progress.speed))
             if progress.eta:
-                pieces.append(self.tr("faltam {tempo}").format(tempo=format_eta(progress.eta)))
-            self._status.setText(SEPARADOR.join(pieces))
+                pieces.append(self.tr("{time} left").format(time=format_eta(progress.eta)))
+            self._status.setText(SEPARATOR.join(pieces))
             self._status.setObjectName("QueueMeta")
             self._show_cancel()
 
         elif status is TaskStatus.CONVERTING:
             self._progress.setValue(1000)
             self._status.setText(
-                traduzir_do_nucleo(progress.detail) or self.tr("Processando o arquivo...")
+                translate_core(progress.detail) or self.tr("Processing the file...")
             )
             self._status.setObjectName("QueueMeta")
             self._show_cancel()
@@ -168,14 +168,14 @@ class QueueItemWidget(QFrame):
         elif status is TaskStatus.FETCHING:
             self._progress.setValue(0)
             self._status.setText(
-                traduzir_do_nucleo(progress.detail) or self.tr("Consultando o vídeo...")
+                translate_core(progress.detail) or self.tr("Looking up the video...")
             )
             self._status.setObjectName("QueueMeta")
             self._show_cancel()
 
         elif status is TaskStatus.QUEUED:
             self._progress.setValue(0)
-            self._status.setText(SEPARADOR.join([self.tr("Na fila"), base]))
+            self._status.setText(SEPARATOR.join([self.tr("Queued"), base]))
             self._status.setObjectName("QueueMeta")
             self._show_cancel()
 
@@ -183,20 +183,20 @@ class QueueItemWidget(QFrame):
             self._progress.setValue(1000)
             self._set_progress_state("done")
             size = format_size(progress.total_bytes or progress.downloaded_bytes)
-            self._status.setText(SEPARADOR.join([self.tr("Concluído"), base, size]))
+            self._status.setText(SEPARATOR.join([self.tr("Done"), base, size]))
             self._status.setObjectName("StatusOk")
             self._show_completed()
 
         elif status is TaskStatus.FAILED:
             self._set_progress_state("error")
             self._progress.setValue(1000)
-            self._status.setText(traduzir_do_nucleo(task.error) or self.tr("Falhou"))
+            self._status.setText(translate_core(task.error) or self.tr("Failed"))
             self._status.setObjectName("StatusError")
             self._show_retry()
 
         elif status is TaskStatus.CANCELLED:
             self._progress.setValue(0)
-            self._status.setText(self.tr("Cancelado"))
+            self._status.setText(self.tr("Cancelled"))
             self._status.setObjectName("QueueMeta")
             self._show_retry()
 
@@ -212,23 +212,23 @@ class QueueItemWidget(QFrame):
         widget.style().unpolish(widget)
         widget.style().polish(widget)
 
-    # ── Botões ───────────────────────────────────────────────────────────
+    # ── Buttons ──────────────────────────────────────────────────────────
 
     def _show_cancel(self) -> None:
-        self._primary_button.setText(self.tr("Cancelar"))
+        self._primary_button.setText(self.tr("Cancel"))
         self._primary_button.setEnabled(True)
         self._secondary_button.setVisible(False)
 
     def _show_completed(self) -> None:
-        self._primary_button.setText(self.tr("Abrir"))
+        self._primary_button.setText(self.tr("Open"))
         self._primary_button.setEnabled(True)
-        self._secondary_button.setText(self.tr("Abrir pasta"))
+        self._secondary_button.setText(self.tr("Open folder"))
         self._secondary_button.setVisible(True)
 
     def _show_retry(self) -> None:
-        self._primary_button.setText(self.tr("Tentar de novo"))
+        self._primary_button.setText(self.tr("Try again"))
         self._primary_button.setEnabled(True)
-        self._secondary_button.setText(self.tr("Remover"))
+        self._secondary_button.setText(self.tr("Remove"))
         self._secondary_button.setVisible(True)
 
     def _on_primary_clicked(self) -> None:
@@ -239,7 +239,7 @@ class QueueItemWidget(QFrame):
             self.retry_requested.emit(self.task_id)
         else:
             self._primary_button.setEnabled(False)
-            self._primary_button.setText(self.tr("Cancelando..."))
+            self._primary_button.setText(self.tr("Cancelling..."))
             self.cancel_requested.emit(self.task_id)
 
     def _on_secondary_clicked(self) -> None:

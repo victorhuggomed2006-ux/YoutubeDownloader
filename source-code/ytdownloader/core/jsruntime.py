@@ -1,11 +1,11 @@
-"""Detecção dos runtimes JavaScript usados pelo yt-dlp.
+"""Detection of the JavaScript runtimes yt-dlp can use.
 
-Desde 2026 o yt-dlp usa um interpretador JavaScript para resolver parte dos
-formatos do YouTube. Por padrão ele só procura o Deno; aqui também aceitamos
-Node e Bun, que são bem mais comuns nas máquinas dos usuários.
+Since 2026 yt-dlp relies on a JavaScript interpreter to resolve part of
+YouTube's formats. By default it only looks for Deno; here Node and Bun are
+accepted too, since they are far more common on users' machines.
 
-Sem nenhum runtime o download continua funcionando, mas alguns vídeos podem
-oferecer menos opções de qualidade.
+With no runtime at all downloads still work, but some videos offer fewer
+quality options.
 """
 
 from __future__ import annotations
@@ -18,16 +18,16 @@ from . import paths
 
 logger = logging.getLogger(__name__)
 
-#: Ordem de preferência. O Deno é o runtime oficialmente suportado.
+#: Preference order. Deno is the officially supported runtime.
 SUPPORTED_RUNTIMES = ("deno", "node", "bun")
 
 
 @lru_cache(maxsize=1)
 def detect() -> dict[str, dict]:
-    """Monta o valor da opção ``js_runtimes`` do yt-dlp.
+    """Build the value for yt-dlp's ``js_runtimes`` option.
 
-    Procura primeiro ao lado do executável (caso um runtime seja distribuído
-    junto no futuro) e depois no PATH do sistema.
+    Looks next to the executable first — in case a runtime is ever shipped
+    alongside the app — and then on the system PATH.
     """
     found: dict[str, dict] = {}
 
@@ -43,12 +43,9 @@ def detect() -> dict[str, dict]:
             found[name] = {"path": system}
 
     if found:
-        logger.info("Runtimes JavaScript disponíveis: %s", ", ".join(found))
+        logger.info("JavaScript runtimes available: %s", ", ".join(found))
     else:
-        logger.info(
-            "Nenhum runtime JavaScript encontrado; alguns vídeos podem oferecer "
-            "menos opções de qualidade."
-        )
+        logger.info("No JavaScript runtime found; some videos may offer fewer quality options.")
     return found
 
 
@@ -61,5 +58,5 @@ def names() -> tuple[str, ...]:
 
 
 def reset_cache() -> None:
-    """Limpa o cache de detecção (útil em testes)."""
+    """Clear the detection cache. Useful in tests."""
     detect.cache_clear()

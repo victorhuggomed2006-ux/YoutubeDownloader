@@ -3,7 +3,42 @@
 Notable changes to this project, following the spirit of
 [Semantic Versioning](https://semver.org).
 
-*As entradas estão em inglês e português.*
+---
+
+## [1.3.0] — 2026-07-26
+
+### Changed
+
+- **The whole project is now written in English** — code, comments, docstrings,
+  user-facing strings and documentation. English is also the translation key,
+  which is the Qt convention and what lets contributors from anywhere read the
+  source.
+- **Three interface languages:** English, Portuguese (Brazil) and Spanish. The
+  app follows the Windows language and can be switched in Settings. Switching
+  asks for a restart, because Qt only rebuilds the text of widgets created
+  after the translator is installed.
+- The Python package moved to the root of `source-code/` instead of a `src/`
+  subfolder, so `pyproject.toml`, the PyInstaller spec and the build scripts
+  all point at one place.
+
+### Fixed
+
+- The interface came up in English on a machine whose display language was
+  Portuguese or Spanish. Qt's `QLocale.system().name()` reports the *regional
+  format* setting, not the display language — an English keyboard layout on a
+  Brazilian Windows is enough to make the two disagree. It now reads
+  `uiLanguages()`, which is the list Windows actually ranks.
+- The cookie setting stored `nenhum` as its value — Portuguese leaking into the
+  data format, where it would have outlived the interface. It is `none` now,
+  and a file written by 1.2.0 is migrated and rewritten on load.
+- `settings.json` and `history.json` were thrown away and replaced by defaults
+  if they carried a byte order mark, which is what Notepad and PowerShell write
+  when someone edits them by hand. Both are read as `utf-8-sig` now.
+- FFmpeg discovery and the install directory both walked one level too far up
+  after the package moved.
+- The download link in the README pointed at GitHub's file page rather than the
+  file. GitHub refuses to render a 96 MB binary, so clicking it produced "we
+  can't show files that are this big right now" instead of a download.
 
 ---
 
@@ -22,7 +57,7 @@ First public release.
 - Cover art, metadata and optional subtitles embedded into the file
 - Download history
 - Light and dark themes
-- Interface in Portuguese and English, following the Windows language
+- Interface following the Windows language
 - Works with YouTube and over a thousand other sites supported by yt-dlp
 
 ### Installation
@@ -45,43 +80,5 @@ First public release.
 - Continuous integration on every push; installers built and published
   automatically from a version tag
 
----
-
-*Primeira versão pública.*
-
-### O aplicativo
-
-- Aplicativo Windows nativo em PySide6
-- Vídeo em MP4, MKV ou WebM, de 360p a 4K, com o áudio já mesclado
-- Áudio em MP3, M4A, Opus, WAV ou FLAC, de 128 a 320 kbps
-- Prévia com miniatura, título, canal e duração antes de baixar
-- Fila com progresso real, velocidade, tempo restante e cancelamento
-- Suporte a playlists
-- Capa, metadados e legendas opcionais gravados no arquivo
-- Histórico de downloads
-- Temas claro e escuro
-- Interface em português e inglês, seguindo o idioma do Windows
-- Funciona com o YouTube e mais de mil outros sites suportados pelo yt-dlp
-
-### Instalação
-
-- Instalador MSI único, por usuário, sem pedir administrador
-- Atalho na Área de Trabalho opcional, escolhido durante a instalação
-- FFmpeg e motor de download embutidos — nenhuma outra dependência
-
-### Por dentro
-
-- Regras de negócio isoladas da interface: `core/` não importa nada do Qt, o que
-  permite rodar a suíte de testes sem abrir janela
-- O motor de download (yt-dlp) se atualiza a partir do PyPI, com verificação
-  SHA-256, na pasta do usuário — sem reinstalar nada e sem privilégio de
-  administrador
-- Erros do yt-dlp traduzidos para linguagem clara em vez da saída crua
-- Downloads em MP4 preferem H.264/AAC a AV1, trocando tamanho de arquivo por
-  compatibilidade com aparelhos e TVs mais antigos
-- 142 testes cobrindo o núcleo, com as defesas de segurança do mecanismo de
-  atualização sob teste explícito
-- Integração contínua a cada push; instaladores compilados e publicados
-  automaticamente a partir de uma tag de versão
-
+[1.3.0]: https://github.com/victorhuggomed2006-ux/YoutubeDownloader/releases/tag/v1.3.0
 [1.2.0]: https://github.com/victorhuggomed2006-ux/YoutubeDownloader/releases/tag/v1.2.0

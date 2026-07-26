@@ -1,106 +1,44 @@
 <div align="center">
 
-# YouTube Downloader
+# YouTube Downloader — documentação técnica
 
-**Aplicativo desktop para Windows que baixa vídeos e áudios do YouTube e de mais de mil outros sites.**
+[Instalação](docs/INSTALLING.md) · [Arquitetura](docs/ARCHITECTURE.md) · [Contribuir](CONTRIBUTING.md) · [Segurança](SECURITY.md) · **[English](README.md)**
 
-[![CI](https://github.com/victorhuggomed2006-ux/YoutubeDownloader/actions/workflows/ci.yml/badge.svg)](https://github.com/victorhuggomed2006-ux/YoutubeDownloader/actions/workflows/ci.yml)
-[![Versão](https://img.shields.io/github/v/release/victorhuggomed2006-ux/YoutubeDownloader)](https://github.com/victorhuggomed2006-ux/YoutubeDownloader/releases/latest)
-[![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org)
-
-[Baixar](#baixar) · [Recursos](#recursos) · [Compilar](#compilando-o-projeto) · [Contribuir](CONTRIBUTING.md) · **[English](README.md)**
-
-![Janela principal](docs/captura-tela-escuro.png)
+![Janela principal](docs/screenshot-dark.png)
 
 </div>
 
 ---
 
-Sem navegador, sem linha de comando, sem Python para instalar. O instalador traz
-o FFmpeg e o motor de download embutidos, então funciona no primeiro clique.
+Aplicativo desktop para Windows feito em PySide6. O instalador traz o FFmpeg e
+o motor de download embutidos, então quem usa não precisa de Python nem de
+qualquer outra dependência.
 
-Por Victor Medeiros. Licença MIT.
-
-## Baixar
-
-**[⬇️ Baixar a versão mais recente](https://github.com/victorhuggomed2006-ux/YoutubeDownloader/releases/latest)**
-
-Pegue o `YouTubeDownloader-1.2.0-Setup.msi`, dê dois cliques e escolha se quer o
-atalho na Área de Trabalho. É isso — o passo a passo detalhado está em
-[`source-code/docs/`](programa).
-
-**Não pede administrador.** O programa é instalado em
-`%LOCALAPPDATA%\Programs\YouTube Downloader`, a pasta que o Windows reserva para
-programas de um único usuário — o mesmo lugar que Chrome, Discord e Spotify
-usam. Não é `C:\Program Files` por um motivo concreto: gravar ali exige
-elevação, sem exceção. Um instalador que não pede nada é, necessariamente, um
-que não escreve em Arquivos de Programas.
-
-**Requisitos:** Windows 10 ou 11 de 64 bits. Cerca de 300 MB de espaço em disco.
-
-> **Sobre o aviso do SmartScreen:** o instalador ainda não é assinado, então o
-> Windows mostra *"Editor desconhecido"*. Clique em **Mais informações →
-> Executar assim mesmo**. A assinatura está planejada — veja
-> [docs/ASSINATURA.md](docs/ASSINATURA.md) para a situação e o raciocínio.
-
-Instalação silenciosa, para quem precisa:
-
-```powershell
-msiexec /i YouTubeDownloader-1.2.0-Setup.msi /qn
-```
-
-O instalador mantém a extensão `.msi` de propósito. Renomeá-lo para `setup.exe`
-o quebraria: o Windows carrega arquivos `.exe` como executáveis PE, e um MSI não
-é um — é a extensão que faz o arquivo ser entregue ao `msiexec`.
+As instruções de instalação estão na [página inicial do projeto](../README.md).
 
 ## Recursos
 
 Vídeo em **MP4, MKV ou WebM**, de 360p a 4K, com o áudio já mesclado. Áudio em
 **MP3, M4A, Opus, WAV ou FLAC**, de 128 a 320 kbps.
 
-Cole um link e o aplicativo mostra a miniatura, o título, o canal e a duração
-antes de você se comprometer com qualquer coisa. A fila aceita vários downloads
-ao mesmo tempo, com progresso real, velocidade, tempo restante e cancelamento.
-Playlists entram na fila de uma vez.
+Cole um link e o programa mostra miniatura, título, canal e duração antes de
+você decidir. A fila aceita vários downloads ao mesmo tempo, com progresso
+real, velocidade, tempo restante e cancelamento. Playlists entram de uma vez.
 
 O arquivo final leva capa e metadados, e legendas quando você pedir. Há
-histórico dos downloads anteriores, temas claro e escuro, e a interface fala
-português e inglês.
+histórico, temas claro e escuro, e a interface fala inglês, português e
+espanhol.
 
 **Não se limita ao YouTube.** Qualquer endereço `http`/`https` é repassado ao
-yt-dlp, que suporta [mais de mil sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)
-— Vimeo, Twitch, SoundCloud, Reddit, Bandcamp e por aí vai. O YouTube mantém um
-caminho dedicado no código porque é o caso comum e permite que a prévia apareça
-antes mesmo de tocar na rede.
+yt-dlp, que suporta [mais de mil sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
+O YouTube mantém um caminho dedicado no código porque é o caso comum e permite
+que a prévia apareça antes mesmo de tocar na rede.
 
-### Vídeos que exigem conta conectada
-
-Vídeos com restrição de idade, conteúdo exclusivo para membros e o pedido de
-*"confirme que você não é um robô"* precisam de uma sessão autenticada. Em
-**Configurações → Usar cookies do navegador**, escolha o navegador em que você
-já está logado e **feche esse navegador** antes de baixar — enquanto ele estiver
-aberto, mantém o arquivo de cookies travado.
-
-## O que mantém tudo funcionando
-
-Os sites mudam a forma de servir vídeo o tempo todo, e quem acompanha isso é o
-**yt-dlp**. Uma cópia congelada dentro do executável envelhece rápido: em poucos
-meses, parte dos vídeos deixaria de baixar.
-
-Por isso o aplicativo verifica ao abrir se há uma versão mais nova do yt-dlp e
-oferece atualizá-la. O pacote vem do PyPI, é conferido contra o resumo SHA-256
-publicado lá e é extraído na sua pasta de usuário — o programa instalado não é
-tocado, e a atualização não exige privilégio de administrador.
-
-Se um vídeo específico parar de baixar, atualizar o motor é a primeira coisa a
-tentar.
-
-## Compilando o projeto
+## Compilando
 
 ```powershell
 git clone https://github.com/victorhuggomed2006-ux/YoutubeDownloader
-cd YoutubeDownloader
+cd YoutubeDownloader/source-code
 powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 ```
 
@@ -110,7 +48,7 @@ executável com o PyInstaller e empacota o instalador. A saída vai para `dist/`
 
 Parâmetros: `-SkipTests`, `-SkipMsi` (só o executável), `-Clean`.
 
-**Requisitos de compilação:** Python 3.10+, .NET SDK 6+ e o WiX 5:
+**Requisitos:** Python 3.10+, .NET SDK 6+ e o WiX 5:
 
 ```powershell
 dotnet tool install --global wix --version 5.0.2
@@ -131,7 +69,7 @@ powershell -ExecutionPolicy Bypass -File packaging\fetch_ffmpeg.ps1
 python packaging\make_icon.py
 powershell -ExecutionPolicy Bypass -File packaging\build_translations.ps1
 
-cd source-code
+$env:PYTHONPATH = "."
 python -m ytdownloader
 ```
 
@@ -144,8 +82,7 @@ ruff format .             # formatador
 ### Organização
 
 ```
-source-code/docs/             onde baixar o instalador
-source-code/ytdownloader/
+ytdownloader/
 ├── core/              regras de negócio — não importa nada do Qt
 │   ├── downloader.py    a camada sobre o yt-dlp
 │   ├── formats.py       qualidades e seletores de formato
@@ -160,7 +97,7 @@ source-code/ytdownloader/
 │   └── paths.py         diretórios do aplicativo
 ├── gui/               interface em PySide6
 │   ├── main_window.py
-│   ├── workers.py       trabalho mantido fora da thread da interface
+│   ├── workers.py       trabalho fora da thread da interface
 │   ├── i18n.py          tradução
 │   ├── theme.py         temas claro e escuro
 │   ├── widgets/
@@ -169,23 +106,36 @@ source-code/ytdownloader/
 
 packaging/             PyInstaller, WiX, ícones, FFmpeg, traduções
 tests/                 testes do núcleo
+docs/                  arquitetura, instalação, assinatura de código
 ```
 
-`core` não importa nada do Qt. Isso não é purismo: é o que permite rodar a suíte
-de testes sem abrir janela, e o que permitiria reaproveitar a lógica de download
-atrás de outra interface.
+`core` não importa nada do Qt. Isso não é purismo: é o que permite rodar a
+suíte de testes sem abrir janela, e o que permitiria reaproveitar a lógica de
+download atrás de outra interface. O detalhamento módulo a módulo está em
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Trabalho demorado nunca toca a thread da interface — passa todo pelos workers em
-`gui/workers.py`, que devolvem resultado por sinais do Qt.
+> **Idioma do código:** o código, os comentários e as strings são escritos em
+> inglês. Português e espanhol vêm como tradução, em
+> `ytdownloader/resources/i18n`.
+
+### Traduções
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\build_translations.ps1
+```
+
+Isso extrai as strings novas para os arquivos `.ts` e compila os `.qm` que o
+aplicativo carrega. Adicionar um idioma está descrito em
+[CONTRIBUTING.md](CONTRIBUTING.md#adding-a-language).
 
 ### Onde ficam os dados do usuário
 
 Em `%APPDATA%\YouTubeDownloader`: `settings.json`, `history.json`,
-`ytdownloader.log` e `runtime/` (versões atualizadas do yt-dlp). Desinstalar não
-apaga essa pasta.
+`ytdownloader.log` e `runtime/` (versões atualizadas do yt-dlp). Desinstalar
+não apaga essa pasta.
 
-O log é o primeiro lugar a olhar quando alguém reporta um problema: ele registra
-a versão do yt-dlp em uso, onde o FFmpeg foi encontrado e qual runtime
+O log é o primeiro lugar a olhar quando alguém reporta um problema: ele
+registra a versão do yt-dlp em uso, onde o FFmpeg foi encontrado e qual runtime
 JavaScript está ativo.
 
 ## Limitações conhecidas
@@ -200,17 +150,19 @@ justa para um caso que atinge poucos vídeos.
 **Alarme falso de antivírus.** Executáveis do PyInstaller às vezes disparam
 heurísticas. O código é aberto e o `build.ps1` reproduz o binário.
 
-**Arquivos MP4 maiores do que você esperaria.** O download prioriza H.264/AAC. O
-YouTube oferece AV1 na mesma resolução com arquivo bem menor, mas AV1 não toca
-em aparelhos e TVs mais antigos. Escolha MKV ou WebM se quiser o arquivo menor.
+**Arquivos MP4 maiores do que você esperaria.** O download prioriza H.264/AAC.
+O YouTube oferece AV1 na mesma resolução com arquivo bem menor, mas AV1 não
+toca em aparelhos e TVs mais antigos. Escolha MKV ou WebM se quiser o arquivo
+menor.
+
+**O instalador não é assinado.** O SmartScreen mostra "Editor desconhecido" até
+que seja. Veja [docs/CODE-SIGNING.md](docs/CODE-SIGNING.md).
 
 ## Licença e créditos
 
 Feito por **Victor Medeiros** — Analista de TI, Desenvolvedor, Engenheiro de IA.
 
 Copyright © 2026 Victor Medeiros. [Licença MIT](LICENSE).
-
-Construído sobre:
 
 | Projeto | Papel | Licença |
 |---|---|---|
@@ -223,5 +175,4 @@ Construído sobre:
 Baixe apenas o que você tem direito de guardar: material próprio, obras em
 domínio público, conteúdo sob licença aberta ou mídia que você tem permissão
 para salvar. Respeite os termos de serviço de cada site e a legislação de
-direitos autorais que se aplica a você. O que você faz com esta ferramenta é
-responsabilidade sua.
+direitos autorais aplicável.

@@ -1,5 +1,5 @@
-# O desenvolvimento acontece dentro de source-code/, que tem o próprio
-# .gitignore. Este arquivo cobre apenas o que possa sobrar na raiz.
+# Development happens inside source-code/, which has its own .gitignore.
+# This file only covers what might end up in the root.
 
 venv/
 .venv/
@@ -10,11 +10,11 @@ dist/
 .ruff_cache/
 __pycache__/
 
-# Editores e sistema
+# Editors and OS
 .vscode/
 .idea/
 Thumbs.db
 desktop.ini
 
-# O instalador publicado É versionado, ao contrário do resto de dist/.
+# The published installer IS tracked, unlike the rest of dist/.
 !YouTubeDownloader-*-Setup.msi

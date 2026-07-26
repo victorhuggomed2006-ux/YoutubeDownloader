@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Instalador do YouTube Downloader.
+  YouTube Downloader installer.
 
-  Instala para o usuário atual, sem pedir elevação. Essa é a razão de o destino
-  ser %LOCALAPPDATA%\Programs e não C:\Program Files: gravar em Arquivos de
-  Programas exige privilégio de administrador, sem exceção — é uma restrição do
-  Windows, não uma escolha do instalador. Chrome, Discord e Spotify instalam no
-  mesmo lugar e pelo mesmo motivo.
+  Installs for the current user, without asking for elevation. That is the
+  reason the destination is %LOCALAPPDATA%\Programs rather than
+  C:\Program Files: writing to Program Files requires administrator rights,
+  with no exceptions — a Windows restriction, not an installer choice. Chrome,
+  Discord and Spotify install in the same place for the same reason.
 
-  O usuário escolhe se quer o atalho na Área de Trabalho; o do Menu Iniciar é
-  sempre criado, porque é por onde o Windows encontra o programa.
+  The user chooses whether to get a Desktop shortcut; the Start Menu one is
+  always created, since that is how Windows finds the program.
 
-  Compilado por packaging/build.ps1. As variáveis AppDir, AppVersion e RepoRoot
-  chegam pela linha de comando.
+  Built by packaging/build.ps1, which passes AppDir, AppVersion and RepoRoot on
+  the command line.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
@@ -23,22 +23,22 @@
            UpgradeCode="3F51138E-43FB-4277-9BEA-18C1BC16932B"
            Scope="perUser"
            Compressed="yes"
-           Language="1046"
+           Language="1033"
            Codepage="1252">
 
-    <SummaryInformation Description="Baixe vídeos e áudios do YouTube e de outros sites"
+    <SummaryInformation Description="Download video and audio from YouTube and other sites"
                         Manufacturer="Victor Medeiros" />
 
-    <!-- Instalar uma versão nova remove a anterior sozinha. -->
+    <!-- Installing a newer version removes the previous one on its own. -->
     <MajorUpgrade AllowSameVersionUpgrades="yes"
-                  DowngradeErrorMessage="Já existe uma versão mais recente do [ProductName] instalada neste computador." />
+                  DowngradeErrorMessage="A newer version of [ProductName] is already installed on this computer." />
 
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
     <Launch Condition="Installed OR VersionNT64"
-            Message="O [ProductName] requer uma versão de 64 bits do Windows." />
+            Message="[ProductName] requires a 64-bit version of Windows." />
 
-    <!-- Informações mostradas em Aplicativos Instalados. -->
+    <!-- Details shown under Installed Apps. -->
     <Icon Id="AppIcon.exe" SourceFile="$(RepoRoot)\packaging\assets\icon.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon.exe" />
     <Property Id="ARPHELPLINK" Value="https://github.com/victorhuggomed2006-ux/YoutubeDownloader" />
@@ -46,23 +46,24 @@
     <Property Id="ARPNOREPAIR" Value="1" />
 
     <!--
-      Não defina ALLUSERS nem MSIINSTALLPERUSER aqui. Scope="perUser" já marca o
-      pacote como compatível com UAC, e nesse caso o Windows Installer ignora
-      essas propriedades — o log diz literalmente "MSIINSTALLPERUSER property is
-      not valid for UAC compliant package". O escopo vem do cabeçalho do pacote.
+      Do not set ALLUSERS or MSIINSTALLPERUSER here. Scope="perUser" already
+      marks the package as UAC compliant, and in that case Windows Installer
+      ignores those properties — the log says so literally: "MSIINSTALLPERUSER
+      property is not valid for UAC compliant package". The scope comes from
+      the package header.
     -->
 
-    <!-- Marcada por padrão; a tela de opções permite desmarcar. -->
+    <!-- Ticked by default; the options screen lets the user clear it. -->
     <Property Id="INSTALLDESKTOPSHORTCUT" Value="1" Secure="yes" />
 
-    <!-- Caixa "abrir agora" da última tela. -->
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Abrir o YouTube Downloader agora" />
+    <!-- Check box on the final screen. -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch YouTube Downloader" />
 
     <WixVariable Id="WixUILicenseRtf" Value="$(RepoRoot)\packaging\wix\license.rtf" />
 
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
 
-    <!-- Executa o aplicativo ao fechar o instalador, se a caixa ficar marcada. -->
+    <!-- Runs the app when the installer closes, if the box is still ticked. -->
     <CustomAction Id="LaunchApplication"
                   Directory="INSTALLFOLDER"
                   ExeCommand="[INSTALLFOLDER]YouTubeDownloader.exe"
@@ -72,29 +73,29 @@
 
     <UI>
       <!--
-        Uma tela extra entre "escolher a pasta" e "confirmar", só com a opção do
-        atalho. Os diálogos do WixUI não têm onde encaixar essa escolha, e a
-        árvore de funcionalidades (WixUI_FeatureTree) mostraria jargão de
-        instalador para quem só quer um atalho.
+        An extra screen between "choose the folder" and "confirm", holding just
+        the shortcut choice. The WixUI dialogs have nowhere to fit it, and the
+        feature tree would show installer jargon to someone who only wants a
+        shortcut.
       -->
-      <Dialog Id="OpcoesDlg" Width="370" Height="270" Title="[ProductName]">
+      <Dialog Id="OptionsDlg" Width="370" Height="270" Title="[ProductName]">
         <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
                  TabSkip="no" Text="!(loc.InstallDirDlgBannerBitmap)" />
         <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
 
         <Control Id="Title" Type="Text" X="15" Y="6" Width="280" Height="15"
-                 Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Atalhos" />
+                 Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Shortcuts" />
         <Control Id="Description" Type="Text" X="25" Y="23" Width="300" Height="15"
-                 Transparent="yes" NoPrefix="yes" Text="Escolha onde o programa deve aparecer." />
+                 Transparent="yes" NoPrefix="yes" Text="Choose where the program should appear." />
 
-        <Control Id="AtalhoAreaTrabalho" Type="CheckBox" X="26" Y="70" Width="310" Height="18"
+        <Control Id="DesktopShortcutCheckBox" Type="CheckBox" X="26" Y="70" Width="310" Height="18"
                  Property="INSTALLDESKTOPSHORTCUT" CheckBoxValue="1"
-                 Text="Criar atalho na Área de Trabalho" />
+                 Text="Create a Desktop shortcut" />
 
-        <Control Id="Explicacao" Type="Text" X="26" Y="96" Width="310" Height="40"
+        <Control Id="Explanation" Type="Text" X="26" Y="96" Width="310" Height="40"
                  NoPrefix="yes"
-                 Text="O atalho no Menu Iniciar é criado sempre. O programa será instalado na sua pasta de usuário e não pedirá permissão de administrador." />
+                 Text="The Start Menu shortcut is always created. The program installs into your user folder and will not ask for administrator permission." />
 
         <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17"
                  Text="!(loc.WixUIBack)">
@@ -111,20 +112,20 @@
       </Dialog>
 
       <!--
-        Encaixa a tela nova na sequência. As ordens maiores que as do WixUI
-        vencem as regras padrão, que iriam direto de InstallDirDlg para
-        VerifyReadyDlg.
+        Slot the new screen into the sequence. Orders higher than WixUI's own
+        win over the default rules, which would go straight from InstallDirDlg
+        to VerifyReadyDlg.
       -->
-      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="OpcoesDlg" Order="10" />
-      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="OpcoesDlg" Order="10" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="OptionsDlg" Order="10" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="OptionsDlg" Order="10" />
 
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchApplication"
                Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
     </UI>
 
     <!--
-      %LOCALAPPDATA%\Programs é o lugar previsto pelo Windows para programas de
-      usuário único. Instalar em Arquivos de Programas obrigaria a elevação.
+      %LOCALAPPDATA%\Programs is where Windows expects single-user programs.
+      Installing into Program Files would force elevation.
     -->
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsFolder" Name="Programs">
@@ -140,17 +141,17 @@
 
     <Feature Id="MainApplication"
              Title="YouTube Downloader"
-             Description="O aplicativo, o motor de download e o FFmpeg."
+             Description="The application, the download engine and FFmpeg."
              Level="1"
              AllowAbsent="no">
       <ComponentGroupRef Id="ApplicationFiles" />
-      <ComponentRef Id="AtalhoMenuIniciar" />
-      <ComponentRef Id="AtalhoAreaTrabalho" />
+      <ComponentRef Id="StartMenuShortcutComponent" />
+      <ComponentRef Id="DesktopShortcutComponent" />
     </Feature>
 
   </Package>
 
-  <!-- Todos os arquivos gerados pelo PyInstaller, incluindo subpastas. -->
+  <!-- Every file PyInstaller produced, subfolders included. -->
   <Fragment>
     <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
       <Files Include="$(AppDir)\**" />
@@ -158,18 +159,19 @@
   </Fragment>
 
   <Fragment>
-    <Component Id="AtalhoMenuIniciar"
+    <Component Id="StartMenuShortcutComponent"
                Directory="AppMenuFolder"
                Guid="7D6AFE7A-A7BB-4CD4-960F-8FA4D5ECC8CE">
       <Shortcut Id="StartMenuShortcut"
                 Name="YouTube Downloader"
-                Description="Baixe vídeos e áudios do YouTube e de outros sites"
+                Description="Download video and audio from YouTube and other sites"
                 Target="[INSTALLFOLDER]YouTubeDownloader.exe"
                 WorkingDirectory="INSTALLFOLDER"
                 Icon="AppIcon.exe" />
 
       <RemoveFolder Id="RemoveAppMenuFolder" Directory="AppMenuFolder" On="uninstall" />
 
+      <!-- MSI requires a key path for the shortcut component. -->
       <RegistryValue Root="HKCU"
                      Key="Software\Victor Medeiros\YouTube Downloader"
                      Name="Installed"
@@ -180,21 +182,21 @@
   </Fragment>
 
   <Fragment>
-    <!-- Só entra se a caixa da tela de opções ficar marcada. -->
-    <Component Id="AtalhoAreaTrabalho"
+    <!-- Only installed when the options screen check box stays ticked. -->
+    <Component Id="DesktopShortcutComponent"
                Directory="DesktopFolder"
                Guid="1B0E4A4C-9F2D-4F4E-8C7A-3D5B6E8F1A20"
                Condition="INSTALLDESKTOPSHORTCUT">
       <Shortcut Id="DesktopShortcut"
                 Name="YouTube Downloader"
-                Description="Baixe vídeos e áudios do YouTube e de outros sites"
+                Description="Download video and audio from YouTube and other sites"
                 Target="[INSTALLFOLDER]YouTubeDownloader.exe"
                 WorkingDirectory="INSTALLFOLDER"
                 Icon="AppIcon.exe" />
 
       <RegistryValue Root="HKCU"
                      Key="Software\Victor Medeiros\YouTube Downloader"
-                     Name="AtalhoAreaTrabalho"
+                     Name="DesktopShortcut"
                      Type="integer"
                      Value="1"
                      KeyPath="yes" />

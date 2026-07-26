@@ -1,8 +1,8 @@
-"""Localização do FFmpeg usado para converter e juntar as faixas.
+"""Locating the FFmpeg used to convert and merge streams.
 
-No aplicativo instalado o FFmpeg vem embutido junto ao executável. Rodando a
-partir do código-fonte, procura-se em ``packaging/vendor/ffmpeg`` e, por último,
-no PATH do sistema.
+In the installed application FFmpeg ships alongside the executable. Running
+from source, it is looked up in ``packaging/vendor/ffmpeg`` and, as a last
+resort, on the system PATH.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ EXE_SUFFIX = ".exe" if os.name == "nt" else ""
 FFMPEG_NAME = f"ffmpeg{EXE_SUFFIX}"
 FFPROBE_NAME = f"ffprobe{EXE_SUFFIX}"
 
-#: Variável de ambiente que permite apontar um FFmpeg específico.
+#: Environment variable that points at a specific FFmpeg build.
 ENV_OVERRIDE = "YTDOWNLOADER_FFMPEG"
 
 
@@ -30,15 +30,16 @@ def _candidate_dirs() -> list[Path]:
         candidate = Path(override)
         dirs.append(candidate if candidate.is_dir() else candidate.parent)
 
-    # Empacotado: ao lado do executável e dentro do bundle temporário.
+    # Packaged: next to the executable and inside the temporary bundle.
     dirs.append(paths.install_dir() / "ffmpeg")
     dirs.append(paths.install_dir())
     dirs.append(paths.bundle_dir() / "ffmpeg")
 
-    # Desenvolvimento: binários baixados pelo script de build.
-    repo_root = Path(__file__).resolve().parents[3]
-    dirs.append(repo_root / "packaging" / "vendor" / "ffmpeg")
-    dirs.append(repo_root / "packaging" / "vendor" / "ffmpeg" / "bin")
+    # Development: binaries fetched by the build script. parents[2] is the
+    # project root (source-code/), which is where packaging/ lives.
+    project_root = Path(__file__).resolve().parents[2]
+    dirs.append(project_root / "packaging" / "vendor" / "ffmpeg")
+    dirs.append(project_root / "packaging" / "vendor" / "ffmpeg" / "bin")
 
     return dirs
 
@@ -57,21 +58,21 @@ def _find(binary_name: str) -> Path | None:
 
 @lru_cache(maxsize=1)
 def ffmpeg_path() -> Path | None:
-    """Caminho do executável do FFmpeg, ou ``None`` se não for encontrado."""
+    """Path to the FFmpeg executable, or ``None`` when not found."""
     return _find(FFMPEG_NAME)
 
 
 @lru_cache(maxsize=1)
 def ffprobe_path() -> Path | None:
-    """Caminho do executável do FFprobe, ou ``None`` se não for encontrado."""
+    """Path to the FFprobe executable, or ``None`` when not found."""
     return _find(FFPROBE_NAME)
 
 
 def ffmpeg_location() -> str | None:
-    """Valor para a opção ``ffmpeg_location`` do yt-dlp.
+    """Value for yt-dlp's ``ffmpeg_location`` option.
 
-    O yt-dlp aceita o diretório que contém os binários, o que também deixa o
-    ``ffprobe`` visível para ele.
+    yt-dlp takes the directory holding the binaries, which also makes
+    ``ffprobe`` visible to it.
     """
     path = ffmpeg_path()
     if path is None:
@@ -84,6 +85,6 @@ def is_available() -> bool:
 
 
 def reset_cache() -> None:
-    """Limpa o cache de descoberta (útil em testes)."""
+    """Clear the lookup cache. Useful in tests."""
     ffmpeg_path.cache_clear()
     ffprobe_path.cache_clear()

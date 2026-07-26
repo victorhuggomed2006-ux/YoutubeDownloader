@@ -1,39 +1,39 @@
 <#
 .SYNOPSIS
-    Gera o executável e o instalador MSI do YouTube Downloader.
+    Builds the YouTube Downloader executable and MSI installer.
 
 .DESCRIPTION
-    Executa o pipeline completo de empacotamento:
-      1. Verifica o ambiente (Python, venv, dependências)
-      2. Baixa o FFmpeg, se ainda não estiver presente
-      3. Gera os ícones
-      4. Roda os testes automatizados
-      5. Compila o executável com o PyInstaller
-      6. Compila o instalador MSI com o WiX
+    Runs the full packaging pipeline:
+      1. Checks the environment (Python, venv, dependencies)
+      2. Downloads FFmpeg, if not already present
+      3. Generates the icons
+      4. Runs the automated tests
+      5. Builds the executable with PyInstaller
+      6. Builds the MSI installer with WiX
 
-    Saída em dist/:
-      YouTubeDownloader/                       aplicativo, para rodar sem instalar
-      YouTubeDownloader-<versao>-Setup.msi     instalador para o usuário final
+    Output in dist/:
+      YouTubeDownloader/                       the app, to run without installing
+      YouTubeDownloader-<version>-Setup.msi    installer for the end user
 
-    O instalador é per-user: grava em %LOCALAPPDATA%\Programs e não pede
-    elevação. Instalar em Arquivos de Programas exigiria privilégio de
-    administrador — é restrição do Windows, não escolha do empacotamento.
+    The installer is per-user: it writes to %LOCALAPPDATA%\Programs and does not
+    ask for elevation. Installing into Program Files would require administrator
+    rights — a Windows restriction, not a packaging choice.
 
 .PARAMETER SkipTests
-    Não roda a suíte de testes antes de compilar.
+    Skips the test suite before building.
 
 .PARAMETER SkipMsi
-    Gera apenas o executável, sem o instalador.
+    Builds only the executable, without the installer.
 
 .PARAMETER Clean
-    Apaga build/ e dist/ antes de começar.
+    Deletes build/ and dist/ before starting.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 
 .NOTES
-    Requisitos: Python 3.10+, .NET SDK 6+ (para o WiX).
-    Autor: Victor Medeiros — licença MIT.
+    Requires: Python 3.10+, .NET SDK 6+ (for WiX).
+    Author: Victor Medeiros — MIT licence.
 #>
 [CmdletBinding()]
 param(
@@ -61,90 +61,90 @@ function Write-Ok([string]$Message) {
 }
 
 # ── 1. Ambiente ──────────────────────────────────────────────────────────
-Write-Step 'Verificando o ambiente'
+Write-Step 'Checking the environment'
 
 if (-not (Test-Path $venvPython)) {
-    Write-Host '    Ambiente virtual nao encontrado. Criando...'
+    Write-Host '    Virtual environment not found. Creating...'
     $systemPython = (Get-Command python -ErrorAction SilentlyContinue).Source
     if (-not $systemPython) {
-        throw 'Python nao encontrado no PATH. Instale o Python 3.10 ou superior.'
+        throw 'Python not found on PATH. Install Python 3.10 or newer.'
     }
     & $systemPython -m venv (Join-Path $repoRoot 'venv')
 }
 
-# Atualizar o pip e desejavel, mas nao essencial: em algumas instalacoes ele nao
-# consegue se substituir e escreve no stderr. Sem o try/catch, o PowerShell
-# transforma esse aviso em erro terminante e o build morre por nada.
+# Upgrading pip is nice to have, not essential: in some installs it cannot
+# replace itself and writes to stderr. Without the try/catch, PowerShell
+# turns that warning into a terminating error and the build dies for nothing.
 try {
     & $venvPython -m pip install --quiet --disable-pip-version-check --upgrade pip
 }
 catch {
-    Write-Host '    (nao foi possivel atualizar o pip; seguindo com a versao atual)'
+    Write-Host '    (could not upgrade pip; carrying on with the current version)'
 }
 
 & $venvPython -m pip install --quiet --disable-pip-version-check -r (Join-Path $repoRoot 'requirements-dev.txt')
-if ($LASTEXITCODE -ne 0) { throw 'Falha ao instalar as dependencias.' }
+if ($LASTEXITCODE -ne 0) { throw 'Failed to install the dependencies.' }
 
 $appVersion = (& $venvPython -c "import sys; sys.path.insert(0, r'$repoRoot'); import ytdownloader; print(ytdownloader.__version__)").Trim()
-if (-not $appVersion) { throw 'Nao foi possivel ler a versao do aplicativo.' }
-Write-Ok "Python pronto. Versao do aplicativo: $appVersion"
+if (-not $appVersion) { throw 'Could not read the application version.' }
+Write-Ok "Python ready. Application version: $appVersion"
 
 if ($Clean) {
-    Write-Step 'Limpando build/ e dist/'
+    Write-Step 'Cleaning build/ and dist/'
     foreach ($dir in @($buildDir, $distDir)) {
         if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
     }
-    Write-Ok 'Pastas removidas.'
+    Write-Ok 'Folders removed.'
 }
 
 # ── 2. FFmpeg ────────────────────────────────────────────────────────────
-Write-Step 'Preparando o FFmpeg'
+Write-Step 'Preparing FFmpeg'
 & (Join-Path $packagingDir 'fetch_ffmpeg.ps1')
-if ($LASTEXITCODE -ne 0) { throw 'Falha ao obter o FFmpeg.' }
+if ($LASTEXITCODE -ne 0) { throw 'Failed to obtain FFmpeg.' }
 
 # ── 3. Icones ────────────────────────────────────────────────────────────
-Write-Step 'Gerando os icones'
+Write-Step 'Generating the icons'
 & $venvPython (Join-Path $packagingDir 'make_icon.py')
-if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar os icones.' }
+if ($LASTEXITCODE -ne 0) { throw 'Failed to generate the icons.' }
 
-# ── 3b. Traducoes ────────────────────────────────────────────────────────
-Write-Step 'Compilando as traducoes'
-& (Join-Path $packagingDir 'build_translations.ps1') -SomenteCompilar
-if ($LASTEXITCODE -ne 0) { throw 'Falha ao compilar as traducoes.' }
+# ── 3b. Translations ─────────────────────────────────────────────────────
+Write-Step 'Compiling the translations'
+& (Join-Path $packagingDir 'build_translations.ps1') -CompileOnly
+if ($LASTEXITCODE -ne 0) { throw 'Failed to compile the translations.' }
 
 # ── 4. Testes ────────────────────────────────────────────────────────────
 if ($SkipTests) {
-    Write-Step 'Testes ignorados (-SkipTests)'
+    Write-Step 'Tests skipped (-SkipTests)'
 }
 else {
-    Write-Step 'Rodando os testes'
+    Write-Step 'Running the tests'
     & $venvPython -m pytest (Join-Path $repoRoot 'tests')
-    if ($LASTEXITCODE -ne 0) { throw 'Os testes falharam. Corrija antes de empacotar.' }
-    Write-Ok 'Todos os testes passaram.'
+    if ($LASTEXITCODE -ne 0) { throw 'The tests failed. Fix them before packaging.' }
+    Write-Ok 'All tests passed.'
 }
 
 # ── 5. Executavel ────────────────────────────────────────────────────────
-Write-Step 'Compilando o executavel (PyInstaller)'
+Write-Step 'Building the executable (PyInstaller)'
 $env:PYTHONPATH = $repoRoot
 & $venvPython -m PyInstaller (Join-Path $packagingDir 'ytdownloader.spec') `
     --noconfirm --distpath $distDir --workpath $buildDir --log-level WARN
-if ($LASTEXITCODE -ne 0) { throw 'O PyInstaller falhou.' }
+if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed.' }
 
 $exePath = Join-Path $appDir 'YouTubeDownloader.exe'
-if (-not (Test-Path $exePath)) { throw "Executavel nao encontrado em $exePath" }
+if (-not (Test-Path $exePath)) { throw "Executable not found at $exePath" }
 
 $appSize = [math]::Round((Get-ChildItem $appDir -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
-Write-Ok "Executavel pronto: $exePath ($appSize MB)"
+Write-Ok "Executable ready: $exePath ($appSize MB)"
 
-# ── 6. Instalador ────────────────────────────────────────────────────────
+# ── 6. Installer ─────────────────────────────────────────────────────────
 if ($SkipMsi) {
-    Write-Step 'Instalador ignorado (-SkipMsi)'
+    Write-Step 'Installer skipped (-SkipMsi)'
     Write-Host ''
-    Write-Host "Concluido. Aplicativo em: $appDir" -ForegroundColor Green
+    Write-Host "Done. Application at: $appDir" -ForegroundColor Green
     exit 0
 }
 
-Write-Step 'Compilando o instalador (WiX)'
+Write-Step 'Building the installer (WiX)'
 
 $wix = Get-Command wix -ErrorAction SilentlyContinue
 if (-not $wix) {
@@ -154,7 +154,7 @@ if (-not $wix) {
     }
     else {
         throw @'
-WiX nao encontrado. Instale com:
+WiX not found. Install it with:
     dotnet tool install --global wix --version 5.0.2
     wix extension add -g WixToolset.UI.wixext/5.0.2
 '@
@@ -164,9 +164,9 @@ else {
     $wix = $wix.Source
 }
 
-# O nome traz "Setup" para deixar obvio o que o arquivo faz. A extensao
-# continua .msi porque e ela que faz o Windows entregar o arquivo ao msiexec:
-# um MSI renomeado para .exe simplesmente nao abre.
+# The name carries "Setup" to make the file's purpose obvious. The extension
+# stays .msi because that is what makes Windows hand the file to msiexec:
+# an MSI renamed to .exe simply does not open.
 $msiName = "YouTubeDownloader-$appVersion-Setup.msi"
 $msiPath = Join-Path $distDir $msiName
 
@@ -179,21 +179,21 @@ $msiPath = Join-Path $distDir $msiName
     -culture pt-BR `
     -out $msiPath
 
-if ($LASTEXITCODE -ne 0) { throw 'O WiX falhou ao gerar o instalador.' }
-if (-not (Test-Path $msiPath)) { throw "Instalador nao encontrado em $msiPath" }
+if ($LASTEXITCODE -ne 0) { throw 'WiX failed to build the installer.' }
+if (-not (Test-Path $msiPath)) { throw "Installer not found at $msiPath" }
 
 $msiSize = [math]::Round((Get-Item $msiPath).Length / 1MB, 1)
 
-# Arquivos intermediarios que nao interessam a quem baixa.
+# Intermediate files that are of no interest to whoever downloads this.
 Get-ChildItem $distDir -Filter '*.wixpdb' -ErrorAction SilentlyContinue | Remove-Item -Force
 
 Write-Host ''
 Write-Host '--------------------------------------------------------'
-Write-Host ' Empacotamento concluido'
+Write-Host ' Packaging complete'
 Write-Host '--------------------------------------------------------'
-Write-Host "  Aplicativo  : $appDir ($appSize MB)"
-Write-Host "  Instalador  : $msiPath ($msiSize MB)"
+Write-Host "  Application : $appDir ($appSize MB)"
+Write-Host "  Installer   : $msiPath ($msiSize MB)"
 Write-Host ''
-Write-Host '  Instala para o usuario atual, sem pedir administrador.'
-Write-Host '  Destino: %LOCALAPPDATA%\Programs\YouTube Downloader'
+Write-Host '  Installs for the current user, with no administrator prompt.'
+Write-Host '  Destination: %LOCALAPPDATA%\Programs\YouTube Downloader'
 Write-Host ''

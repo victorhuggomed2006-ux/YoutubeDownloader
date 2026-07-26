@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest something the application should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write in English, Portuguese or Spanish — whichever you are
+        comfortable with.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: |
+        Describe the situation, not the solution. Knowing what you are trying
+        to accomplish often reveals a better answer than the one first imagined.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What do you have in mind?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do today?
+      description: How you work around it now, if at all.

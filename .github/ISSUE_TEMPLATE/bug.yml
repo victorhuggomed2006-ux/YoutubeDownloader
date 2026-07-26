@@ -1,47 +1,44 @@
-name: Bug report / Relatar um problema
+name: Bug report
 description: Something is not working as it should
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        Write in English or Portuguese — both work.
-        Escreva em inglês ou português, tanto faz.
+        Write in English, Portuguese or Spanish — whichever you are
+        comfortable with.
 
   - type: input
-    id: versao
+    id: version
     attributes:
-      label: Version / Versão
-      description: Shown in the About window. / Aparece na janela Sobre.
-      placeholder: "1.0.0"
+      label: Version
+      description: Shown in the About window.
+      placeholder: "1.3.0"
     validations:
       required: true
 
   - type: dropdown
-    id: instalacao
+    id: install
     attributes:
-      label: How did you install it? / Como instalou?
+      label: How did you install it?
       options:
-        - Setup.exe installer
-        - MSI package
-        - From source / A partir do código-fonte
+        - MSI installer
+        - From source
     validations:
       required: true
 
   - type: textarea
-    id: descricao
+    id: description
     attributes:
-      label: What happened? / O que aconteceu?
-      description: |
-        What you were trying to do, and what happened instead.
-        O que você tentou fazer e o que aconteceu no lugar.
+      label: What happened?
+      description: What you were trying to do, and what happened instead.
     validations:
       required: true
 
   - type: textarea
-    id: passos
+    id: steps
     attributes:
-      label: Steps to reproduce / Como reproduzir
+      label: Steps to reproduce
       placeholder: |
         1. Paste this link: ...
         2. Choose MP4, 1080p
@@ -52,11 +49,10 @@ body:
   - type: input
     id: link
     attributes:
-      label: Video link / Link do vídeo
+      label: Video link
       description: |
         Only if the problem happens with a specific video. Skip it if the video
         is private.
-        Só se o problema acontece com um vídeo específico. Pule se for privado.
 
   - type: textarea
     id: log
@@ -66,18 +62,14 @@ body:
         The relevant part of `%APPDATA%\YouTubeDownloader\ytdownloader.log`.
         It records the yt-dlp version in use, where FFmpeg was found and the
         actual error — usually enough to pinpoint the cause.
-
-        O trecho relevante de `%APPDATA%\YouTubeDownloader\ytdownloader.log`.
-        Ele registra a versão do yt-dlp, onde o FFmpeg foi encontrado e o erro
-        real — normalmente o bastante para achar a causa.
       render: text
 
   - type: checkboxes
-    id: verificacoes
+    id: checks
     attributes:
-      label: Before submitting / Antes de enviar
+      label: Before submitting
       options:
-        - label: I updated the download engine in Settings / Atualizei o motor de download em Configurações
+        - label: I updated the download engine in Settings
           required: true
-        - label: I searched the existing issues / Procurei nas issues existentes
+        - label: I searched the existing issues
           required: true

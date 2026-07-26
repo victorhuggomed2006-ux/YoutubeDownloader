@@ -1,4 +1,4 @@
-"""Histórico de downloads, persistido em JSON."""
+"""Download history, stored as JSON."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ MAX_ENTRIES = 500
 
 
 class HistoryStore:
-    """Lista dos downloads mais recentes, do mais novo para o mais antigo."""
+    """The most recent downloads, newest first."""
 
     def __init__(self, path: Path | None = None, max_entries: int = MAX_ENTRIES) -> None:
         self._path = path or paths.history_file()
@@ -32,9 +32,11 @@ class HistoryStore:
         if not self._path.exists():
             return []
         try:
-            raw = json.loads(self._path.read_text(encoding="utf-8"))
+            # utf-8-sig for the same reason as the settings: a hand-edited file
+            # may carry a BOM, and that should not throw the history away.
+            raw = json.loads(self._path.read_text(encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError) as exc:
-            logger.warning("Não foi possível ler o histórico (%s); começando vazio.", exc)
+            logger.warning("Could not read the history (%s); starting empty.", exc)
             return []
 
         if not isinstance(raw, list):
@@ -59,7 +61,7 @@ class HistoryStore:
             )
             temp.replace(self._path)
         except OSError as exc:
-            logger.error("Falha ao salvar o histórico: %s", exc)
+            logger.error("Failed to save the history: %s", exc)
 
     def add(self, entry: HistoryEntry) -> None:
         with self._lock:

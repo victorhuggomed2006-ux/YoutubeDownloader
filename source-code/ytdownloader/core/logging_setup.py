@@ -1,4 +1,4 @@
-"""Configuração do log do aplicativo."""
+"""Application logging setup."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ BACKUP_COUNT = 2
 
 
 def configure(level: int = logging.INFO) -> None:
-    """Instala os handlers de arquivo e console uma única vez."""
+    """Install the file and console handlers, once."""
     root = logging.getLogger()
     if getattr(root, "_ytdownloader_configured", False):
         return
@@ -30,9 +30,9 @@ def configure(level: int = logging.INFO) -> None:
         file_handler.setFormatter(formatter)
         root.addHandler(file_handler)
     except OSError:
-        pass  # sem permissão de escrita: segue apenas com o console
+        pass  # no write permission: carry on with the console alone
 
-    # No executável em modo janela não existe console; evita erro de stream nulo.
+    # A windowed executable has no console; this avoids a null-stream error.
     if sys.stderr is not None:
         stream_handler = logging.StreamHandler()
         stream_handler.setFormatter(formatter)

@@ -1,7 +1,7 @@
-"""Tarefas executadas fora da thread da interface.
+"""Work that runs off the interface thread.
 
-Cada worker é um ``QRunnable`` com um objeto de sinais próprio, para que o
-resultado volte à interface pela fila de eventos do Qt.
+Each worker is a ``QRunnable`` with its own signals object, so results come
+back to the interface through Qt's event queue.
 """
 
 from __future__ import annotations
@@ -21,23 +21,23 @@ REQUEST_TIMEOUT = 15
 
 
 class _Signals(QObject):
-    """Sinais comuns a todos os workers."""
+    """Signals shared by every worker."""
 
     finished = Signal(str)  # task_id
 
 
 class InfoSignals(_Signals):
     ready = Signal(str, object)  # task_id, VideoInfo
-    failed = Signal(str, str)  # task_id, mensagem
+    failed = Signal(str, str)  # task_id, message
 
 
 class InfoWorker(QRunnable):
-    """Consulta os metadados de um vídeo."""
+    """Fetches a video's metadata."""
 
     def __init__(self, url: str, cookies_from_browser: str, token: str = "") -> None:
         super().__init__()
-        # A janela guarda uma referência para poder cancelar; sem isto o Qt
-        # destruiria o objeto ao fim da execução e a chamada seria inválida.
+        # The window keeps a reference so it can cancel; without this Qt would
+        # destroy the object once run() returns and the call would be invalid.
         self.setAutoDelete(False)
         self.url = url
         self.token = token
@@ -55,7 +55,7 @@ class InfoWorker(QRunnable):
             if not self._cancelled.is_set():
                 self.signals.failed.emit(self.token, str(exc))
         except Exception as exc:
-            logger.exception("Falha inesperada ao consultar o vídeo")
+            logger.exception("Unexpected failure while looking up the video")
             if not self._cancelled.is_set():
                 self.signals.failed.emit(self.token, str(humanize(exc)))
         else:
@@ -71,7 +71,7 @@ class PlaylistSignals(_Signals):
 
 
 class PlaylistWorker(QRunnable):
-    """Lista os vídeos de uma playlist."""
+    """Lists the videos in a playlist."""
 
     def __init__(self, url: str, cookies_from_browser: str, token: str = "") -> None:
         super().__init__()
@@ -86,7 +86,7 @@ class PlaylistWorker(QRunnable):
         except DownloaderError as exc:
             self.signals.failed.emit(self.token, str(exc))
         except Exception as exc:
-            logger.exception("Falha inesperada ao consultar a playlist")
+            logger.exception("Unexpected failure while reading the playlist")
             self.signals.failed.emit(self.token, str(humanize(exc)))
         else:
             self.signals.ready.emit(self.token, videos)
@@ -95,11 +95,11 @@ class PlaylistWorker(QRunnable):
 
 
 class ThumbnailSignals(QObject):
-    ready = Signal(str, bytes)  # token, dados da imagem
+    ready = Signal(str, bytes)  # token, image data
 
 
 class ThumbnailWorker(QRunnable):
-    """Baixa a miniatura do vídeo."""
+    """Downloads a video thumbnail."""
 
     def __init__(self, url: str, token: str) -> None:
         super().__init__()
@@ -117,19 +117,20 @@ class ThumbnailWorker(QRunnable):
             response.raise_for_status()
             self.signals.ready.emit(self.token, response.content)
         except Exception as exc:
-            logger.debug("Miniatura indisponível (%s)", exc)
+            # A missing thumbnail is cosmetic; never let it surface as an error.
+            logger.debug("Thumbnail unavailable (%s)", exc)
 
 
 class DownloadSignals(QObject):
     progress = Signal(str, object)  # task_id, Progress
     completed = Signal(str, object)  # task_id, Path
-    failed = Signal(str, str)  # task_id, mensagem
+    failed = Signal(str, str)  # task_id, message
     cancelled = Signal(str)  # task_id
     info_ready = Signal(str, object)  # task_id, VideoInfo
 
 
 class DownloadWorker(QRunnable):
-    """Executa um download completo, com progresso e cancelamento."""
+    """Runs a full download, reporting progress and honouring cancellation."""
 
     def __init__(
         self,
@@ -139,7 +140,7 @@ class DownloadWorker(QRunnable):
         info: VideoInfo | None = None,
     ) -> None:
         super().__init__()
-        # A fila mantém uma referência viva para permitir o cancelamento.
+        # The queue keeps a live reference so cancellation stays possible.
         self.setAutoDelete(False)
         self.task_id = task_id
         self.request = request
@@ -159,11 +160,11 @@ class DownloadWorker(QRunnable):
             self.signals.cancelled.emit(self.task_id)
             return
 
-        # Busca os metadados quando o item foi adicionado sem preview carregado.
+        # Items queued without a loaded preview have no metadata yet.
         if self.info is None:
             try:
                 info = self._downloader.fetch_info(self.request.url)
-            except Exception:
+            except Exception:  # the download itself reports the real error
                 info = None
             if info is not None:
                 self.info = info
@@ -180,7 +181,7 @@ class DownloadWorker(QRunnable):
         except DownloaderError as exc:
             self.signals.failed.emit(self.task_id, str(exc))
         except Exception as exc:
-            logger.exception("Falha inesperada durante o download")
+            logger.exception("Unexpected failure during the download")
             self.signals.failed.emit(self.task_id, str(humanize(exc)))
         else:
             if self.cancel_event.is_set():
@@ -190,14 +191,14 @@ class DownloadWorker(QRunnable):
 
 
 class UpdateSignals(QObject):
-    available = Signal(str)  # nova versão
+    available = Signal(str)  # new version
     up_to_date = Signal()
     installed = Signal(str)
     failed = Signal(str)
 
 
 class UpdateCheckWorker(QRunnable):
-    """Verifica no PyPI se existe uma versão mais nova do yt-dlp."""
+    """Checks PyPI for a newer yt-dlp."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -209,7 +210,8 @@ class UpdateCheckWorker(QRunnable):
         try:
             version = updater.update_available()
         except Exception as exc:
-            logger.debug("Verificação de atualização falhou: %s", exc)
+            # Being offline must not produce an error dialog at startup.
+            logger.debug("Update check failed: %s", exc)
             return
         if version:
             self.signals.available.emit(version)
@@ -218,7 +220,7 @@ class UpdateCheckWorker(QRunnable):
 
 
 class UpdateInstallWorker(QRunnable):
-    """Baixa e instala a versão mais recente do yt-dlp."""
+    """Downloads and installs the newest yt-dlp."""
 
     def __init__(self) -> None:
         super().__init__()
@@ -230,7 +232,7 @@ class UpdateInstallWorker(QRunnable):
         try:
             version = updater.update_now()
         except Exception as exc:
-            logger.warning("Falha ao atualizar o yt-dlp: %s", exc)
+            logger.warning("Failed to update yt-dlp: %s", exc)
             self.signals.failed.emit(str(exc))
             return
 

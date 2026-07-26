@@ -1,4 +1,4 @@
-"""Script de entrada usado pelo PyInstaller para gerar o executável."""
+"""The entry script PyInstaller uses to build the executable."""
 
 from __future__ import annotations
 
