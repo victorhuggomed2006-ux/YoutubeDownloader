@@ -1,0 +1,45 @@
+# gitleaks configuration: scans the working tree (pre-commit) and the full history (CI).
+# Extends the built-in ruleset (150+ providers) and adds a few extra formats. Keep the allowlist
+# narrow: every exception is a place a real secret could hide.
+title = "gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API key"
+regex = '''sk-ant-(?:api|admin)\d{2}-[A-Za-z0-9_\-]{20,}'''
+keywords = ["sk-ant-"]
+
+[[rules]]
+id = "openrouter-api-key"
+description = "OpenRouter API key"
+regex = '''sk-or-v1-[a-f0-9]{32,}'''
+keywords = ["sk-or-v1-"]
+
+[[rules]]
+id = "huggingface-token"
+description = "Hugging Face access token"
+regex = '''\bhf_[A-Za-z0-9]{30,}\b'''
+keywords = ["hf_"]
+
+[[rules]]
+id = "pypi-api-token"
+description = "PyPI API token"
+regex = '''pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_\-]{50,}'''
+keywords = ["pypi-agei"]
+
+[[allowlists]]
+description = "Generated files and caches that are not project source"
+paths = [
+  '''(^|/)\.venv/''',
+  '''(^|/)venv/''',
+  '''(^|/)__pycache__/''',
+  '''(^|/)\.mypy_cache/''',
+  '''(^|/)\.ruff_cache/''',
+  '''(^|/)\.pytest_cache/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)(dist|build)/''',
+  '''(^|/)[^/]+\.egg-info/''',
+]
